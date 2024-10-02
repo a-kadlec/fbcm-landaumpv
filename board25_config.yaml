@@ -1,0 +1,19 @@
+board_number: 25
+output_dir: "./plots"
+
+# Parameters for the calibartion data from the lab
+calibration_data: "./testboard25_12/toa_tot_25_2.npz"
+measurement: "12_CBm14"
+
+# Parameters of the histogram data file from the testbeam
+histogram_data: "./histogram_data_db25.dat"
+RC: 3
+th: [3.15,1.75,1.45,1.45,1.85,1.85]
+
+# An upper cutoff in ns for the Landau fit
+cutoff: 25
+
+# initial fit parameters
+log_p0: [25,3.5,0.01,-0.01]
+landau_p0: [8.0E+6,4.34,1.2]
+spline_smoothing_param: 10
