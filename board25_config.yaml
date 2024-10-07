@@ -2,16 +2,24 @@ board_number: 25
 output_dir: "./plots"
 
 # Parameters for the calibartion data from the lab
-calibration_data: "./testboard25_12/toa_tot_25_2.npz"
 measurement: "12_CBm14"
+calibration_data: "./testboard25_12/toa_tot_25_2.npz"
+# If the board had 2 ASICs, put the file of the right-side one to 'calibration_data', and the left one to 'calibratin_data_left'. (If the board had only 1 ASIC, set calibration_data_left to False.)
+calibration_data_left: False
 
 # Parameters of the histogram data file from the testbeam
 histogram_data: "./histogram_data_db25.dat"
 RC: 3
 th: [3.15,1.75,1.45,1.45,1.85,1.85]
 
-# An upper cutoff in ns for the Landau fit
+# An upper cutoff in ns and fC for the initial Landau fit
 cutoff: 25
+cutoff_fC: 15
+# A cutoff for the refined Landau fit: if a point has a larger relative deviation to the initial fit than this value, it is ignored in the refined fit
+cutoff_ref: 0.15
+
+# Display precision (number of decimals) of MPV on plots:
+mpv_display_precision: 2
 
 # initial fit parameters
 log_p0: [25,3.5,0.01,-0.01]
