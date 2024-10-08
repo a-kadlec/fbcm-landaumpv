@@ -55,7 +55,7 @@ def main(argv: list[str] = sys.argv[1:]):
     #print("Common Charge plot [log vs pline calib]...")
     #landaumvp_fit(histograms_data, output_dir/f"tot_fc_fit.png", config_file, calibration, "both")
     print("Refined Landau plot...")
-    landaumvp_refined_fit(histograms_data, output_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png", config_file, calibration, "log")
+    landaumvp_refined_fit(histograms_data, output_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png", config_file, calibration, config_file['used_calibration_type'])
 
 
 def get_histograms(data: bytes, timestamps: list = []) -> dict[str, list]:
@@ -144,7 +144,7 @@ def raw_tot_plot(histograms_data, output_file, config_file):
         time_bins += bin_width/2
 
 
-        y_axis = interspill_sum - intraspill_sum   # was intra - inter, reversed
+        y_axis = abs(interspill_sum - intraspill_sum)   # was intra - inter, reversed
 
         if cutoff:
             for i in range(len(time_bins)):
@@ -156,12 +156,15 @@ def raw_tot_plot(histograms_data, output_file, config_file):
         errorbars = np.sqrt(y_axis)
         #print(y_axis)
         #print(errorbars)
+        for i in range(len(errorbars)):
+            if errorbars[i] == 0:
+                errorbars[i] = 1
 
         #ax.plot(time_bins, y_axis, ".", color="black")   
         ax.plot(time_bins, y_axis, 'sb')
         ax.errorbar(time_bins, y_axis, yerr=errorbars, capsize=3, fmt=".", ecolor = "black")
 
-        fig.suptitle("ToT distribution of board25 RC"+str(config_file['RC']))
+        fig.suptitle(f"ToT distribution of board{config_file['board_number']} RC"+str(config_file['RC']))
         ax.set_title(f"Channel {channel_number}, th: {config_file['th'][channel_number]} fC")
         ax.set_xticks(np.arange(math.floor(min(time_bins)), math.ceil(max(time_bins)), 4.0))
         ax.set_xticks(np.arange(math.floor(min(time_bins)), math.ceil(max(time_bins)), 2.0), minor=True)
@@ -279,9 +282,9 @@ def landaumvp_fit(histograms_data, output_file, config_file, calibration, calib_
 
         ax.legend(loc='best', prop={'size': 11})
         if calib_type == "both":
-            fig.suptitle(f"Distribution fits to Amplitude Spectrum of board25, RC{config_file['RC']}, Landau fits")
+            fig.suptitle(f"Distribution fits to Amplitude Spectrum of board{config_file['board_number']}, RC{config_file['RC']}, Landau fits")
         else:
-            fig.suptitle(f"Distribution fits to Amplitude Spectrum of board25, RC{config_file['RC']}, {calib_type}-cal.")
+            fig.suptitle(f"Distribution fits to Amplitude Spectrum of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
 
         ax.set_title(f"Channel {channel_number}, th: {calibration['th'][calib_i]} fC")
         ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 2.0))
@@ -391,7 +394,7 @@ def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration
 
 
         ax.legend(loc='best', prop={'size': 11})
-        fig.suptitle(f"Landau Distribution fits to Amplitude Spectrum of board25, RC{config_file['RC']}, {calib_type}-cal.")
+        fig.suptitle(f"Landau Distribution fits to Amplitude Spectrum of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
 
         ax.set_title(f"Channel {channel_number}, th: {calibration['th'][calib_i]} fC")
         ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 2.0))

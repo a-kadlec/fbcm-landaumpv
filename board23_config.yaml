@@ -1,16 +1,16 @@
-board_number: 25
+board_number: 23
 output_dir: "./plots"
 
 # Parameters for the calibartion data from the lab
-measurement: "12_CBm14"
-calibration_data: "./testboard25_12/toa_tot_25_2.npz"
+measurement: "RT_WS_9"
+calibration_data: "./testboard23_RT_WS_9/ASIC_right/toa_tot_23_2.npz"
 # If the board had 2 ASICs, put the file of the right-side one to 'calibration_data', and the left one to 'calibratin_data_left'. (If the board had only 1 ASIC, set calibration_data_left to False.)
-calibration_data_left: False
+calibration_data_left: "./testboard23_RT_WS_9/ASIC_left/toa_tot_23_2.npz"
 
 # Parameters of the histogram data file from the testbeam
-histogram_data: "./histogram_data_db25.dat"
+histogram_data: "./histogram_data_db23.dat"
 RC: 3
-th: [3.15,1.75,1.45,1.45,1.85,1.85]
+th: [0.7,0.7,0.7,0.7,0.7,0.7]
 
 # The calibration type to select to prepare the data for the fit. Can be "log" or "spline"
 used_calibration_type: "log"
@@ -22,9 +22,9 @@ cutoff_fC: 15
 cutoff_ref: 0.15
 
 # Display precision (number of decimals) of MPV on plots:
-mpv_display_precision: 2
+mpv_display_precision: 3
 
 # initial fit parameters
-log_p0: [25,3.5,0.01,-0.01]
+log_p0: [30,3.5,0.01,-0.01] 
 landau_p0: [8.0E+6,4.34,1.2]
 spline_smoothing_param: 10
