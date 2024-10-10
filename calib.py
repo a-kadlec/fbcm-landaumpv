@@ -240,7 +240,7 @@ def get_ASIC_calibration(data, sample, config_file):
                 ax.plot(xfit, myTot_fit, 'sb', label='ToT')
                 if bUseSigma:
                     ax.errorbar(xfit, myTot_fit, yerr=sigma_fit, capsize=3, fmt=".", ecolor = "black")
-                ax.plot(xvalues, tw[r,th_level_fC,start:end:step]*1e9, 'or', label='TW') # FIXME
+                ax.plot(xvalues, tw[r,th_level_fC,start:end:step]*1e9, 'or', label='TW')
 
                 goodlim_x = ax.get_xlim()
                 goodlim_y = ax.get_ylim()

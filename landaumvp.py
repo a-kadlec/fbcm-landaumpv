@@ -312,6 +312,11 @@ def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration
         axs.append(fig.add_subplot(gs[0]))
         bottom_axs.append(0)
 
+
+    mpvs = []
+    mpv_errs = []
+    mpv_systs_up = []
+    mpv_systs_down = []
     for (hist_name, (timestamps, hist_data)), (ax, bottom_ax) in zip(histograms_data.items(), zip(axs, bottom_axs)):
         timestamps, hist_data = _clean_histograms_arrays(timestamps, hist_data)
 
@@ -368,7 +373,7 @@ def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration
         fc_bins_off = []
         y_axis_off = []
         for i in range(len(y_axis)):
-            if (fc_bins[i] < popt[1] or abs(y_axis[i] -  popt[0]*landau.pdf(fc_bins[i], popt[1], popt[2])) / y_axis[i] < config_file['cutoff_ref']):    # and y_axis[i] > 0 
+            if (fc_bins[i] < popt[1] or abs(y_axis[i] -  popt[0]*landau.pdf(fc_bins[i], popt[1], popt[2])) / y_axis[i] < config_file['cutoff_ref']) and i >= config_file['cutoff_lower'][channel_number]:    # and y_axis[i] > 0 
                 fc_bins_fit.append(fc_bins[i])
                 y_axis_fit.append(y_axis[i])
             else:
@@ -384,16 +389,58 @@ def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration
         popt_ref, pcov_ref = curve_fit(lambda x, N, mpv, xi: N*landau.pdf(x, mpv, xi), fc_bins_fit, y_axis_fit, p0 = popt) #, sigma = np.sqrt(y_axis_fit), absolute_sigma = True)
         perr_ref = np.sqrt(np.diag(pcov_ref))
 
+        # systematic study: how much does mpv change by adding an extra point from the cutoff ones
+        # plus one point
+        fc_bins_syst = list(fc_bins_fit)
+        fc_bins_syst.append(fc_bins_off[0])
+        y_axis_syst = list(y_axis_fit)
+        y_axis_syst.append(y_axis_off[0])
+        popt_syst, pcov_syst = curve_fit(lambda x, N, mpv, xi: N*landau.pdf(x, mpv, xi), fc_bins_syst, y_axis_syst, p0 = popt)
+        mpv_syst_more = popt_syst[1] - popt_ref[1]
+
+        # one point less
+        fc_bins_syst = fc_bins_fit[:-1]
+        y_axis_syst = y_axis_fit[:-1]
+        popt_syst, pcov_syst = curve_fit(lambda x, N, mpv, xi: N*landau.pdf(x, mpv, xi), fc_bins_syst, y_axis_syst, p0 = popt)
+        mpv_syst_less = popt_syst[1] - popt_ref[1]
+
+
+        larger = mpv_syst_more if mpv_syst_more > mpv_syst_less else mpv_syst_less
+        smaller = mpv_syst_more if mpv_syst_more <= mpv_syst_less else mpv_syst_less
+        
+        if larger > 0:
+            mpv_systs_up.append(larger)
+            if smaller > 0:
+                mpv_systs_down.append(0)
+            else:
+                mpv_systs_down.append(abs(smaller))
+        else:
+            mpv_systs_up.append(0)
+            mpv_systs_down.append(abs(smaller))
+
+
+
+
+
         x_axis_fit = np.linspace(min(fc_bins_fit) if min(fc_bins_fit) > math.floor(min(fc_bins_off)) else math.floor(min(fc_bins_fit)), max(fc_bins_fit), 1000)
         x_axis_off = np.linspace(math.floor(min(fc_bins_off)) if math.floor(min(fc_bins_off)) < max(fc_bins_fit) else max(fc_bins_fit), max(fc_bins_off), 1000)
 
-        mpv_string = eval( "'%."+str(config_file['mpv_display_precision'])+"f±%."+str(config_file['mpv_display_precision'])+"f' % (popt_ref[1],perr_ref[1])" )
+        mpvs.append(popt_ref[1])
+        mpv_errs.append(perr_ref[1])
+
+        mpv_string = eval( " '%."+str(config_file['mpv_display_precision'])+"f±%."+str(config_file['mpv_display_precision'])+"f' % (popt_ref[1],perr_ref[1])"  
+     
+        + "+"+ "r'$^{+%."+str(config_file['mpv_display_precision'])+r"f}_{-%."+str(config_file['mpv_display_precision'])+r"f}$'  % (mpv_systs_up[-1],mpv_systs_down[-1])"    )
+
+
         ax.plot(x_axis_off, popt_ref[0]*landau.pdf(x_axis_off, popt_ref[1], popt_ref[2]), "--", color="crimson")  
-        ax.plot(x_axis_fit, popt_ref[0]*landau.pdf(x_axis_fit, popt_ref[1], popt_ref[2]), "-", color="crimson", label = f"MPV=({mpv_string}) fC")  
+        ax.plot(x_axis_fit, popt_ref[0]*landau.pdf(x_axis_fit, popt_ref[1], popt_ref[2]), "-", color="crimson", label = f"MPV = ({mpv_string}) fC\n"+r"$d_{eff}$"+r" = (%.2f$^{+%.2f}_{-%.2f}$)" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1])     ) + r" $\mu$m")  
                 # "MPV=(%.2f±%.2f) fC" % (popt_ref[1],perr_ref[1]))  
 
 
-        ax.legend(loc='best', prop={'size': 11})
+        leg = ax.legend(loc='best', prop={'size': 11}, handletextpad=0, handlelength=0)
+        #for item in leg.legendHandles:
+        #    item.set_visible(False)
         fig.suptitle(f"Landau Distribution fits to Amplitude Spectrum of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
 
         ax.set_title(f"Channel {channel_number}, th: {calibration['th'][calib_i]} fC")
@@ -407,7 +454,35 @@ def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration
     fig.savefig(output_file)
     plt.close(fig)
 
+    # Summary plot
+    fig = plt.figure(2, figsize=(7, 5))
+    ax = fig.add_subplot(111)
+    ax.set_title(f"Summary plot of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
+    ax.set_xlabel('Threshold [fC]')
+    ax.set_ylabel('MPV [fC]')
+    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
+    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
+    for i in range(len(config_file['th'])):
+        #asymmetric_error = np.array(list(zip(mpv_errs[i]+mpv_systs_down[i], mpv_errs[i]+mpv_systs_up[i]))).T
+        asymmetric_error = [[mpv_errs[i]+mpv_systs_down[i]], [mpv_errs[i]+mpv_systs_up[i]]]
 
+        ax.errorbar(config_file['th'][i], mpvs[i], yerr=asymmetric_error, capsize=3, fmt=".", ecolor = "black", color="black")
+        ax.plot(config_file['th'][i], mpvs[i], 's', color=colors[i])
+        ax.errorbar(config_file['th'][i], mpvs[i], yerr=mpv_errs[i], capsize=3, fmt=".", ecolor = colors[i], color=colors_dots[i], label="Channel "+str(i))
+
+    ax.grid(linestyle = "--")
+    ax.legend(loc='best', prop={'size': 11})
+
+    y1, y2 = ax.get_ylim()
+    x1, x2 = ax.get_xlim()
+    ax2 = ax.twinx()
+    ax2.set_ylim(_mpv_to_thickness(y1),_mpv_to_thickness(y2))
+    ax2.set_yticks( range(int(_mpv_to_thickness(y1)), int(_mpv_to_thickness(y2)), 2))
+    ax2.tick_params(axis="y", which = 'major', labelsize=10)
+    ax2.set_ylabel(r"$d_{eff}$ [$\mu$m]", fontsize = 11)
+    ax2.set_xlim(x1,x2)
+
+    fig.savefig(config_file['output_dir']+f"/MPV_th_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png") # FIXME
 
 
 

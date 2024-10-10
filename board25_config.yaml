@@ -15,14 +15,17 @@ th: [3.15,1.75,1.45,1.45,1.85,1.85]
 # The calibration type to select to prepare the data for the fit. Can be "log" or "spline"
 used_calibration_type: "log"
 
-# An upper cutoff in ns and fC for the initial Landau fit
+# An upper cutoff in ns for the raw tot plot
 cutoff: 25
+# An upper cutoff in fC for the initial Landau fit 
 cutoff_fC: 15
 # A cutoff for the refined Landau fit: if a point has a larger relative deviation to the initial fit than this value, it is ignored in the refined fit
 cutoff_ref: 0.15
+# A lower cutoff to weaken the effect of near-0 points for the refined fit. Separate for each channel, number specifies number of omitted points from the left of the x-axis.
+cutoff_lower: [0,0,0,0,0,0]
 
 # Display precision (number of decimals) of MPV on plots:
-mpv_display_precision: 2
+mpv_display_precision: 3
 
 # initial fit parameters
 log_p0: [25,3.5,0.01,-0.01]
