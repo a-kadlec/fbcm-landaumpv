@@ -12,3 +12,4 @@ Note: During the calibration log fitting, RuntimeWarnings may pop up, because th
 
 ## Extra requirements:
 landaupy: https://github.com/SengerM/landaupy
+pyyaml
