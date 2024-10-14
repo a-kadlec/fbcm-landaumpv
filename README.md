@@ -11,5 +11,6 @@ python3 calib.py <board_config_file_name>.yaml -s
 Note: During the calibration log fitting, RuntimeWarnings may pop up, because the range of parameters is not constrained at the moment. Using the -s option suppresses these warnings.
 
 ## Extra requirements:
-landaupy: https://github.com/SengerM/landaupy
-pyyaml
+landaupy: https://github.com/SengerM/landaupy 
+
+pyyaml: https://pypi.org/project/PyYAML/
