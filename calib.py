@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
@@ -93,6 +94,12 @@ def get_ASIC_calibration(data, sample, config_file):
         testboard_channels = test_conditions["channels"]
         asic_channels = test_conditions["channels"]
 
+
+    tot_summary = []
+    tot_summary_x = []
+    tot_std_summary = []
+    tot_summary_text = []
+    tot_summary_params = []
     #for testboard_channel in test_conditions['channels']:
     for asic_channel, testboard_channel in zip(asic_channels,testboard_channels):
 
@@ -119,6 +126,7 @@ def get_ASIC_calibration(data, sample, config_file):
         # err = tot > 1e10
         # toa[err] = 0
         # tot[err] = 0
+
         for th_level_fC in range(len(test_conditions['th_list_fC'])):
             for r in range(len(test_conditions['rccal'])):
                 if test_conditions['rccal'][r] == 0: continue
@@ -129,7 +137,7 @@ def get_ASIC_calibration(data, sample, config_file):
                 except:
                     pass
 
-                fig = plt.figure()
+                fig = plt.figure(2)
                 ax = fig.add_axes([0,0,1,1])
                 ax.set_title('Timing scan (S: %s, CH: %s, RC=%x, th=%.2f fC)' % (sample, testboard_channel, test_conditions['rccal'][r], test_conditions['th_list_fC'][th_level_fC]))
                 ax.set_ylabel('Time [ns]')
@@ -194,6 +202,13 @@ def get_ASIC_calibration(data, sample, config_file):
                 output['th'].append(test_conditions['th_list_fC'][th_level_fC])
                 output['channel'].append(testboard_channel)
 
+
+                if test_conditions['th_list_fC'][th_level_fC] == config_file['th'][testboard_channel] and test_conditions['rccal'][r] == config_file['RC']:
+                    tot_summary.append( myTot_fit.copy())
+                    tot_summary_x.append( xfit.copy())
+                    tot_std_summary.append(sigma_fit.copy())
+                    tot_summary_text.append({'ch': testboard_channel, 'th': config_file['th'][testboard_channel]}  )
+                    tot_summary_params.append(popt.copy())
 
                 fit_chcalval = np.arange(0.6e-15, mychcalval[-1], (mychcalval[1]-mychcalval[0])/10)*1e15
                 fit_tot = tot_func(fit_chcalval, *popt)
@@ -262,6 +277,38 @@ def get_ASIC_calibration(data, sample, config_file):
                 # plt.yscale('log')
                 fig.savefig(config_file['output_dir']+'/calib_plots/tot_tw_sample_%s_channel_%d_rccal_%d_th_%s.jpg' % (sample, testboard_channel, test_conditions['rccal'][r],  test_conditions['th_list_fC'][th_level_fC]), format='jpg', bbox_inches='tight')
                 plt.close()
+
+
+
+    fig = plt.figure(2, figsize=(15, 10))
+    ax = fig.add_subplot(111)
+    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
+    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
+    ax.set_title(f"Timing scan summary of board{config_file['board_number']}, RC{config_file['RC']}")
+    ax.set_xlabel('Input charge [fC]')
+    ax.set_ylabel('Time [ns]')
+
+    for i in range(len(tot_summary)):
+        ax.plot(tot_summary_x[i], tot_summary[i], 's', color=colors[i])
+        ax.errorbar(tot_summary_x[i], tot_summary[i], yerr=tot_std_summary[i], capsize=3, fmt=".", ecolor = colors[i], color=colors_dots[i], label="Ch"+str(tot_summary_text[i]['ch'])+", th"+str(tot_summary_text[i]['th']))
+
+    goodlim_x = ax.get_xlim()
+    goodlim_y = ax.get_ylim()
+    for i in range(len(tot_summary)):
+        ax.plot(fit_chcalval, tot_func(fit_chcalval, *tot_summary_params[i]) , colors[i])
+    ax.set_xlim(goodlim_x)
+    ax.set_ylim(goodlim_y)
+
+    ax.set_xticks(np.arange(round(goodlim_x[0]),round(goodlim_x[1]),0.5))
+    ax.set_xticks(np.arange(round(goodlim_x[0]),round(goodlim_x[1]),0.1),minor=True)
+
+    ax.grid(linestyle = "-")
+    ax.grid(linestyle = "--", which='minor')
+    ax.legend(loc='best', prop={'size': 10})  # bbox_to_anchor=(0, 0, 0.9, 0.9)
+    fig.savefig(config_file['output_dir']+'/calib_plots/tot_tw_sample_%s_rccal_%d_summary.jpg' % (sample, config_file['RC']), format='jpg', bbox_inches='tight')
+    plt.close()
+
+
     return output
 
 
@@ -325,6 +372,9 @@ if __name__ == "__main__":
     with open(args.configfile_name, 'r') as file:
         config_file = yaml.safe_load(file)
 
+
+    if not os.path.exists(str(config_file['output_dir'])+"/calib_plots"):
+        os.makedirs(str(config_file['output_dir'])+"/calib_plots")
 
     if args.suppress_warnings:
         hide_warnings(True)

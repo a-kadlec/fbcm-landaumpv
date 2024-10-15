@@ -123,10 +123,18 @@ def gauss(x, H, A, x0, sigma):
 
 def raw_tot_plot(histograms_data, output_file, config_file):
 
+
+    fig = plt.figure(1, figsize=(15, 10))
+    ax = fig.add_subplot(111)
+    ax.set_title(f"ToT distribution summary of board{config_file['board_number']} RC"+str(config_file['RC']))
+
+    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
+    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
+
     cutoff = config_file['cutoff']
     axs = []
     bottom_axs = []
-    fig = plt.figure(tight_layout=True, figsize=(15, 10))
+    fig = plt.figure(2, tight_layout=True, figsize=(15, 10))
     gs_top_level = plt.GridSpec(2, 3, figure=fig)
     for i in range(6):
         gs = gs_top_level[i].subgridspec(2, 1, height_ratios=[4, 1], hspace=0)
@@ -170,12 +178,29 @@ def raw_tot_plot(histograms_data, output_file, config_file):
         ax.set_xticks(np.arange(math.floor(min(time_bins)), math.ceil(max(time_bins)), 2.0), minor=True)
         ax.set_ylabel(f"Count / {bin_width:.2f} ns")
         ax.set_xlabel("Time over threshold [ns]")
+        ax.grid(linestyle = "--")
 
+
+        fig = plt.figure(1)
+        ax = plt.gca()
+        
+        ax.plot(time_bins, y_axis*(1./max(y_axis)), 's', color=colors[channel_number])
+        ax.errorbar(time_bins, y_axis*(1./max(y_axis)), yerr=errorbars*(1./max(y_axis)), capsize=3, fmt=".", ecolor = colors[channel_number], color=colors_dots[channel_number], label = "Ch"+str(channel_number))
+
+        ax.grid(linestyle = "--")
+        fig = plt.figure(2)
+        ax = plt.gca()
     fig.savefig(output_file)
-    plt.close(fig)
+    plt.close()
 
-
-
+    fig = plt.figure(1)
+    ax = plt.gca()
+    ax.set_ylabel(f"Count [Max normalized to 1]")
+    ax.set_xlabel("Time over threshold [ns]")
+    ax.legend(loc="best")
+    ax.grid(linestyle = "--")
+    fig.savefig(config_file['output_dir']+f"/tot_raw_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
+    plt.close()
 
 
 
@@ -302,10 +327,19 @@ def landaumvp_fit(histograms_data, output_file, config_file, calibration, calib_
 
 def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration, calib_type = "log"):
 
+
+    fig = plt.figure(1, figsize=(15, 10))
+    ax = fig.add_subplot(111)
+    ax.set_title(f"Amplitude Spectrum summary of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
+
+    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
+    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
+
+
     cutoff = config_file['cutoff']
     axs = []
     bottom_axs = []
-    fig = plt.figure(tight_layout=True, figsize=(15, 10))
+    fig = plt.figure(2, tight_layout=True, figsize=(15, 10))
     gs_top_level = plt.GridSpec(2, 3, figure=fig)
     for i in range(6):
         gs = gs_top_level[i].subgridspec(2, 1, height_ratios=[4, 1], hspace=0)
@@ -451,11 +485,37 @@ def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration
         ax.grid(linestyle = "--")
 
         print("Channel "+str(channel_number)+" eff. thickness: (%.2f±%.2f) um" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])))
+
+
+        fig = plt.figure(1)
+        ax = plt.gca()
+        
+        y_axis_fit = np.array(y_axis_fit)
+        ax.plot(fc_bins_fit, y_axis_fit*(1./max(y_axis_fit)),  's', color=colors[channel_number])
+        ax.errorbar(fc_bins_fit, y_axis_fit*(1./max(y_axis_fit)), yerr=np.sqrt(y_axis_fit)*(1./max(y_axis_fit)), capsize=3, fmt=".", ecolor = colors[channel_number], color=colors_dots[channel_number])
+        ax.plot(x_axis_fit, popt_ref[0]*landau.pdf(x_axis_fit, popt_ref[1], popt_ref[2])*(1./max(y_axis_fit)), "-", color=colors[channel_number], label = f"Ch{channel_number} MPV = ({mpv_string}) fC\n"+r"$d_{eff}$"+r" = (%.2f$^{+%.2f}_{-%.2f}$)" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1])     ) + r" $\mu$m")  
+
+        ax.grid(linestyle = "--")
+        fig = plt.figure(2)
+        ax = plt.gca()
+
     fig.savefig(output_file)
     plt.close(fig)
 
+    fig = plt.figure(1)
+    ax = plt.gca()
+    ax.set_ylabel(f"Count [Max normalized to 1]")
+    ax.set_xlabel("Charge [fC]")
+    ax.legend(loc='best', prop={'size': 10})
+    ax.grid(linestyle = "--")
+    fig.savefig(config_file['output_dir']+f"/tot_fc_fit_refined_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
+    plt.close(fig)
+
+
+
+
     # Summary plot
-    fig = plt.figure(2, figsize=(7, 5))
+    fig = plt.figure(3, figsize=(7, 5))
     ax = fig.add_subplot(111)
     ax.set_title(f"Summary plot of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
     ax.set_xlabel('Threshold [fC]')
@@ -482,7 +542,7 @@ def landaumvp_refined_fit(histograms_data, output_file, config_file, calibration
     ax2.set_ylabel(r"$d_{eff}$ [$\mu$m]", fontsize = 11)
     ax2.set_xlim(x1,x2)
 
-    fig.savefig(config_file['output_dir']+f"/MPV_th_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png") # FIXME
+    fig.savefig(config_file['output_dir']+f"/MPV_th_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png") 
 
 
 
