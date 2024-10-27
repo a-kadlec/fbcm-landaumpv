@@ -24,7 +24,7 @@ To run the code, first you need to edit and set up the board configuration yaml 
 <summary>Details of the config keys</summary>
   
 * board_number: (integer) the board number of the currently analyzed board 
-* output_dir: (string) the directory where the output plots and files should be created
+* output_dir: (string) the directory where the output plots and files should be created. If the path does not already exist, the code will attempt to create it
 * measurement: (string) a descriptive name for the measurement that will be concated to the board number in file names. Should reflect the conditions of the used calibration, for example "CBm14_WS_IRRAD_GRD_20"
 
 * calibration_data: (string) the path to the npz pickle file of the lab calibration. If the board has two ASICs, then put the calibration file for the RIGHT asic here.
