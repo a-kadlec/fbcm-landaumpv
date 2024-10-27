@@ -4,6 +4,7 @@ This package is for fitting a Landau function over the ToT spectrum, and to calc
 Calibration data (tot vs collected charge) is taken at the lab - this data is fit with some function to provide a "conversion" between time and charge for the x-axis of the testbeam tot histogram data. Currently the fits can be:
 - a logarithmic fit with 3 parameters: a + b*log(x+c)
 - a smoothed cubic spline interplation
+
 The selected curve will be then applied to the histogram data.
 
 ## Landau fitting and effective thickness calculation
