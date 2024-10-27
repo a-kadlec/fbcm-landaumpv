@@ -8,11 +8,14 @@ calibration_data: "./testboard25_12/toa_tot_25_2.npz"
 calibration_data_left: False
 
 # Parameters of the histogram data file from the testbeam
-histogram_data: "./histogram_data_db25.dat"
+histogram_data_dir: "/data/testbeam2/histogram_data"
+histogram_data_files: "histogram_data_run_538_2024-07-26_07-27-05.dat"
 RC: 3
-th: [3.15,1.75,1.45,1.45,1.85,1.85]
+threshold_per_channel: [3.15,1.75,1.45,1.45,1.85,1.85]
 
-# The calibration type to select to prepare the data for the fit. Can be "log" or "spline"
+# The types of calibration curves to fit onto the calibration data plots. Can be "log" and "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
+calibration_types: "log"
+# The calibration type to select to prepare the histogram data for the fit. Can be "log" OR "spline", not both
 used_calibration_type: "log"
 
 # An upper cutoff in ns for the raw tot plot
@@ -21,13 +24,13 @@ cutoff: 25
 cutoff_fC: 15
 # A cutoff for the refined Landau fit: if a point has a larger relative deviation to the initial fit than this value, it is ignored in the refined fit
 cutoff_ref: 0.15
-# A lower cutoff to weaken the effect of near-0 points for the refined fit. Separate for each channel, number specifies number of omitted points from the left of the x-axis.
+# A lower cutoff to study the effect of near-0 points for the refined fit on the left tail. Separate for each channel, number specifies number of omitted points from the left of the x-axis.
 cutoff_lower: [0,0,0,0,0,0]
 
 # Display precision (number of decimals) of MPV on plots:
 mpv_display_precision: 3
 
 # initial fit parameters
-log_p0: [25,3.5,0.01,-0.01]
+log_p0: [15,3.5,10] 
 landau_p0: [8.0E+6,4.34,1.2]
 spline_smoothing_param: 10

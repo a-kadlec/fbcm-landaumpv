@@ -2,32 +2,35 @@ board_number: 23
 output_dir: "./plots"
 
 # Parameters for the calibartion data from the lab
-measurement: "RT_WS_9"
-calibration_data: "./testboard23_RT_WS_9/ASIC_right/toa_tot_23_2.npz"
+measurement: "CBm14_WS_IRRAD_GRD_20"
+calibration_data: "./testboard23_RT_WS_IRRAD_GRD_20/ASIC_right/toa_tot_23_2.npz"
 # If the board had 2 ASICs, put the file of the right-side one to 'calibration_data', and the left one to 'calibratin_data_left'. (If the board had only 1 ASIC, set calibration_data_left to False.)
-calibration_data_left: "./testboard23_RT_WS_9/ASIC_left/toa_tot_23_2.npz"
+calibration_data_left: "./testboard23_RT_WS_IRRAD_GRD_20/ASIC_left/toa_tot_23_2.npz"
 
 # Parameters of the histogram data file from the testbeam
-histogram_data: "./histogram_data_db23.dat"
+histogram_data_dir: "/data/testbeam2/histogram_data"
+histogram_data_files: [569, 573, 574, 576, 577]
 RC: 3
-th: [0.7,0.7,0.7,0.7,0.7,0.7]
+threshold_per_channel: [0.7,0.7,0.7,0.7,0.7,0.7]
 
-# The calibration type to select to prepare the data for the fit. Can be "log" or "spline"
+# The types of calibration curves to fit onto the calibration data plots. Can be "log" and "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
+calibration_types: "log"
+# The calibration type to select to prepare the histogram data for the fit. Can be "log" OR "spline", not both
 used_calibration_type: "log"
 
 # An upper cutoff in ns for the raw tot plot
 cutoff: 25
 # An upper cutoff in fC for the initial Landau fit 
-cutoff_fC: 15
+cutoff_fC: 8
 # A cutoff for the refined Landau fit: if a point has a larger relative deviation to the initial fit than this value, it is ignored in the refined fit
 cutoff_ref: 0.15
-# A lower cutoff to weaken the effect of near-0 points for the refined fit. Separate for each channel, number specifies number of omitted points from the left of the x-axis.
+# A lower cutoff to study the effect of near-0 points for the refined fit on the left tail. Separate for each channel, number specifies number of omitted points from the left of the x-axis.
 cutoff_lower: [0,0,0,0,0,0]
 
 # Display precision (number of decimals) of MPV on plots:
 mpv_display_precision: 3
 
 # initial fit parameters
-log_p0: [30,3.5,0.01,-0.01] 
+log_p0: [18,3.5,10] 
 landau_p0: [8.0E+6,4.34,1.2]
 spline_smoothing_param: 10
