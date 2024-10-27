@@ -19,11 +19,11 @@ calibration_types: "log"
 used_calibration_type: "log"
 
 # An upper cutoff in ns for the raw tot plot
-cutoff: 25
+cutoff_ns: 25
 # An upper cutoff in fC for the initial Landau fit 
 cutoff_fC: 8
-# A cutoff for the refined Landau fit: if a point has a larger relative deviation to the initial fit than this value, it is ignored in the refined fit
-cutoff_ref: 0.15
+# A cutoff in percent (%) for the refined Landau fit: if a point has a larger relative deviation to the initial fit than this value, it is ignored in the refined fit
+cutoff_ref: 15
 # A lower cutoff to study the effect of near-0 points for the refined fit on the left tail. Separate for each channel, number specifies number of omitted points from the left of the x-axis.
 cutoff_lower: [0,0,0,0,0,0]
 

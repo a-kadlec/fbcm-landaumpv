@@ -179,7 +179,7 @@ def _process_input_files(config_file, argtimestamps):
 
 def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
 
-    cutoff = config_file['cutoff']
+    cutoff = config_file['cutoff_ns']
     axs = []
     bottom_axs = []
     fig = plt.figure(tight_layout=True, figsize=(15, 10))
@@ -234,7 +234,7 @@ def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
 
 def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, calibration, calib_type = "log"):
 
-    cutoff = config_file['cutoff']
+    cutoff = config_file['cutoff_ns']
     axs = []
     bottom_axs = []
     fig = plt.figure(tight_layout=True, figsize=(15, 10))
@@ -304,7 +304,7 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             fc_bins_left_off = []
             y_axis_left_off = []
             for i in range(len(y_axis)):
-                if (fc_bins[i] < popt[1] or abs(y_axis[i] -  popt[0]*landau.pdf(fc_bins[i], popt[1], popt[2])) / y_axis[i] < config_file['cutoff_ref']) and i >= config_file['cutoff_lower'][channel_number]:    # and y_axis[i] > 0 
+                if (fc_bins[i] < popt[1] or abs(y_axis[i] -  popt[0]*landau.pdf(fc_bins[i], popt[1], popt[2])) / y_axis[i] < (config_file['cutoff_ref']/100.)) and i >= config_file['cutoff_lower'][channel_number]:    # and y_axis[i] > 0 
                     fc_bins_fit.append(fc_bins[i])
                     y_axis_fit.append(y_axis[i])
                 else:
@@ -440,7 +440,7 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
 # OLD FUNCTION: this was used for checking if landau or landau-gauss convolution is the better fit.
 def landaumvp_fit(x_axes_data, y_axes_data, output_file, config_file, calibration, calib_type = "log"):
 
-    cutoff = config_file['cutoff']
+    cutoff = config_file['cutoff_ns']
     axs = []
     bottom_axs = []
     fig = plt.figure(tight_layout=True, figsize=(18, 12))
