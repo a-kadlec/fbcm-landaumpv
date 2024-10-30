@@ -1,3 +1,16 @@
+# Get the package
+Clone the files to your local computer. To clone files from a GitHub repository, just run: 
+```
+git clone https://github.com/a-kadlec/fbcm-landaumpv.git
+```
+Alternatively, you can download the files by clicking the green "<> Code" button on the repository page.
+
+## Extra requirements:
+These need to be installed in your pyenv.
+1) landaupy: https://github.com/SengerM/landaupy 
+2) pyyaml: https://pypi.org/project/PyYAML/
+
+
 # How it works
 This package is for fitting a Landau function over the ToT spectrum, and to calculate the effective thickness of the FBCM sensors. This takes 2 steps:
 ## Calibration: the x-axis of the histogram data must be converted from ns to fC
@@ -69,7 +82,3 @@ Note: During the calibration fitting, RuntimeWarnings may pop up if the log func
 python3 calib.py <board_config_file_name>.yaml -w
 ```
 
-
-## Extra requirements:
-1) landaupy: https://github.com/SengerM/landaupy 
-2) pyyaml: https://pypi.org/project/PyYAML/
