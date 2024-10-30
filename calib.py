@@ -201,46 +201,33 @@ def get_ASIC_calibration(data, sample, config_file):
                     sigma = tot_std[r,th_level_fC,start:end:step]*1e9
                 else:
                     sigma = np.array( [1] * len(myTot) )
+                
+                #for sig in sigma:
+                #    print(sig)
 
                 
-                # issue: if x value is < 1, log fit will fail - exclude these points from the fit.
-                x_off = []
-                tot_off = []
-                sigma_off = []
-                for find_i in range(len(xvalues)):
-                    if xvalues[find_i] >= 0.0:
-                        xfit = xvalues[find_i:]
-                        myTot_fit = myTot[find_i:]
-                        sigma_fit = sigma[find_i:]
 
-                        if find_i > 0:
-                            x_off = xvalues[:find_i]
-                            tot_off = myTot[:find_i]
-                            sigma_off = sigma[:find_i]
-                        break
-                
                 if bCalibLog:
-                    #xfit_trick = np.array(xfit) + 5
-                    popt, pcov = curve_fit(tot_func, xfit, myTot_fit, p0=config_file['log_p0'], sigma = sigma_fit, absolute_sigma = True)
-                    #popt[2] += 5
+                    popt, pcov = curve_fit(tot_func, xvalues, myTot, p0=config_file['log_p0'], sigma = sigma, absolute_sigma = True)
 
-                    Nexp = tot_func(xfit, *popt)
-                    Ndif = myTot_fit - Nexp
-                    chi2 = np.sum((Ndif/sigma_fit)**2)
-                    chi2ondf = chi2 / (len(myTot_fit) - len(popt))
+                    Nexp = tot_func(xvalues, *popt)
+                    Ndif = myTot - Nexp
+                    chi2 = np.sum((Ndif/sigma)**2)
+                    chi2ondf = chi2 / (len(myTot) - len(popt))
 
                     output['fitparams'].append(popt.copy())
 
+                    fit_chcalval = np.arange(0.6e-15, mychcalval[-1], (mychcalval[1]-mychcalval[0])/10)*1e15
+                    fit_tot = tot_func(fit_chcalval, *popt)
+
                     if test_conditions['th_list_fC'][th_level_fC] == config_file['threshold_per_channel'][testboard_channel] and test_conditions['rccal'][r] == config_file['RC']:
-                        tot_summary.append( myTot_fit.copy())
-                        tot_summary_x.append( xfit.copy())
-                        tot_std_summary.append(sigma_fit.copy())
+                        tot_summary.append( myTot.copy())
+                        tot_summary_x.append( xvalues.copy())
+                        tot_std_summary.append(sigma.copy())
                         tot_summary_text.append({'ch': testboard_channel, 'th': config_file['threshold_per_channel'][testboard_channel]}  )
                         tot_summary_params.append(popt.copy())
                         tot_summary_fitchcalval.append(fit_chcalval.copy())
 
-                    fit_chcalval = np.arange(0.6e-15, mychcalval[-1], (mychcalval[1]-mychcalval[0])/10)*1e15
-                    fit_tot = tot_func(fit_chcalval, *popt)
 
                 if bCalibSpline:
                     from scipy.interpolate import CubicSpline
@@ -280,11 +267,9 @@ def get_ASIC_calibration(data, sample, config_file):
                 #print(chcalval[start]*1e15)
                 #ax.plot(chcalval[start:end:step]*1e15, toa[r,start:end:step]*1e9, 'sr', label='ToA')
 
-                if x_off:
-                    ax.errorbar(x_off, tot_off, yerr=sigma_off, capsize=3, fmt="x", ecolor = "black", color="black")
-                ax.plot(xfit, myTot_fit, 'sb', label='ToT')
+                ax.plot(xvalues, myTot, 'sb', label='ToT')
                 if bUseSigma:
-                    ax.errorbar(xfit, myTot_fit, yerr=sigma_fit, capsize=3, fmt=".", ecolor = "black")
+                    ax.errorbar(xvalues, myTot, yerr=sigma, capsize=3, fmt=".", ecolor = "black")
                 ax.plot(xvalues, tw[r,th_level_fC,start:end:step]*1e9, 'or', label='TW')
 
                 goodlim_x = ax.get_xlim()
