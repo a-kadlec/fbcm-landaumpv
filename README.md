@@ -1,5 +1,5 @@
 # Get the package
-Clone the files to your local computer. To clone files from a GitHub repository, just run: 
+You can clone the repository with:
 ```
 git clone https://github.com/a-kadlec/fbcm-landaumpv.git
 ```
