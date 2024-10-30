@@ -199,6 +199,11 @@ def get_ASIC_calibration(data, sample, config_file):
 
                 if bUseSigma:
                     sigma = tot_std[r,th_level_fC,start:end:step]*1e9
+
+                    for i_s in range(len(sigma)):
+                        if sigma[i_s] == 0:
+                            sigma[i_s] = 0.0001
+                            print("WARNING: An std value of 0 was provided in tot_std.")
                 else:
                     sigma = np.array( [1] * len(myTot) )
                 
