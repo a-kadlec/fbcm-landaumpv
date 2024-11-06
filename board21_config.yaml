@@ -10,13 +10,9 @@ calibration_data_left: "./testboard21_CBm12_WS_IRRAD_GRD_11/ASIC_left/toa_tot_21
 # Parameters of the histogram data file from the testbeam
 histogram_data_dir: "/data/testbeam2/histogram_data/th_scan_sample_21_rc3_6pad_2asic_direct_bonding_irrad/"
 histogram_data_files: "histogram_data_run_standalone_th_scan_0.900_2024-07-28_16-21-35.dat"
-# [569, 573, 574, 576, 577] 0.7 RC3
 RC: 3
 threshold_per_channel: [0.9,0.9,0.9,0.9,0.9,0.9]
 expected_thickness_per_channel: [150,150,150,150,150,150]  # in micrometer
-
-#/data/testbeam2/histogram_data/th_scan_sample_23_rc3_6pad_2asic/histogram_data_run_standalone_th_scan_0.900_2024-07-27_04-17-36.dat
-#/data/testbeam2/histogram_data/histogram_data_run_551_2024-07-27_12-42-40.dat
 
 # The types of calibration curves to fit onto the calibration data plots. Can be "log" and "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
 calibration_types: "log"
