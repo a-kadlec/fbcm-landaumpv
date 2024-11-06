@@ -1,18 +1,22 @@
-board_number: 23
+board_number: 21
 output_dir: "./plots"
 
 # Parameters for the calibartion data from the lab
-measurement: "CBm14_WS_IRRAD_GRD_20"
-calibration_data: "./testboard23_RT_WS_IRRAD_GRD_20/ASIC_right/toa_tot_23_2.npz"
+measurement: "CBm12_WS_IRRAD_GRD_11"
+calibration_data: "./testboard21_CBm12_WS_IRRAD_GRD_11/ASIC_right/toa_tot_21_2.npz"
 # If the board had 2 ASICs, put the file of the right-side one to 'calibration_data', and the left one to 'calibratin_data_left'. (If the board had only 1 ASIC, set calibration_data_left to False.)
-calibration_data_left: "./testboard23_RT_WS_IRRAD_GRD_20/ASIC_left/toa_tot_23_2.npz"
+calibration_data_left: "./testboard21_CBm12_WS_IRRAD_GRD_11/ASIC_left/toa_tot_21_2.npz"
 
 # Parameters of the histogram data file from the testbeam
-histogram_data_dir: "/data/testbeam2/histogram_data"
-histogram_data_files: [569, 573, 574, 576, 577]
+histogram_data_dir: "/data/testbeam2/histogram_data/th_scan_sample_21_rc3_6pad_2asic_direct_bonding_irrad/"
+histogram_data_files: "histogram_data_run_standalone_th_scan_0.900_2024-07-28_16-21-35.dat"
+# [569, 573, 574, 576, 577] 0.7 RC3
 RC: 3
-threshold_per_channel: [0.7,0.7,0.7,0.7,0.7,0.7]
-expected_thickness_per_channel: [150,150,150,150,150,150]  # in micrometer FIXME: update values for board 23
+threshold_per_channel: [0.9,0.9,0.9,0.9,0.9,0.9]
+expected_thickness_per_channel: [150,150,150,150,150,150]  # in micrometer
+
+#/data/testbeam2/histogram_data/th_scan_sample_23_rc3_6pad_2asic/histogram_data_run_standalone_th_scan_0.900_2024-07-27_04-17-36.dat
+#/data/testbeam2/histogram_data/histogram_data_run_551_2024-07-27_12-42-40.dat
 
 # The types of calibration curves to fit onto the calibration data plots. Can be "log" and "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
 calibration_types: "log"

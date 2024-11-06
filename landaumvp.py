@@ -50,7 +50,7 @@ def main(argv: list[str] = sys.argv[1:]):
     #print("Common Charge plot [log vs pline calib]...")
     #landaumvp_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit.png", config_file, calibration, "both")
     print("Refined Landau plot...")
-    landaumvp_refined_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png", config_file, calibration, config_file['used_calibration_type'])
+    landaumvp_refined_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_TH{config_file['threshold_per_channel']}.png", config_file, calibration, config_file['used_calibration_type'])
 
 
 def get_histograms(data: bytes, timestamps: list = []) -> dict[str, list]:
@@ -282,7 +282,7 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
     mpv_systs_up = []
     mpv_systs_down = []
     with open(config_file['output_dir']+"/results_board"+str(config_file['board_number'])+"_"+config_file['measurement']+".dat", "w") as result_file:
-        print("#Channel number | MPV [fC] | MPV stat [fC] | MPV syst up [fC] | MPV syst down [fC] | d_eff [um] | d_eff stat+syst up [um] | d_eff stat+syst down [um]", file=result_file)
+        print("#Channel number | MPV [fC] | MPV stat [fC] | MPV syst up [fC] | MPV syst down [fC] | d_eff [um] | d_eff stat+syst up [um] | d_eff stat+syst down [um] | dev. from expected d_eff (%)", file=result_file)
 
 
         for channel_number in range(len(y_axes_data)):
@@ -304,6 +304,8 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             for calib_i in range(len(calibration['RC'])): 
                 if calibration['th'][calib_i] == config_file['threshold_per_channel'][channel_number]  and calibration['RC'][calib_i] == config_file['RC'] and calibration['channel'][calib_i] == channel_number:
                     break
+            else: # no break happened
+                raise Exception(f"Error: calibration not found for channel {channel_number}, RC {config_file['RC']}, threshold {config_file['threshold_per_channel'][channel_number]}.")
 
             if calib_type == "log":
                 fc_bins = calib.invert_tot_func(time_bins, *calibration['fitparams'][calib_i])
@@ -427,9 +429,11 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             ax.set_xlabel("Charge [fC]")
             ax.grid(linestyle = "--")
 
-            print("Channel "+str(channel_number)+" eff. thickness: (%.2f±%.2f(stat)) um" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])))
+            dev_from_expected = abs(config_file['expected_thickness_per_channel'][channel_number] - _mpv_to_thickness(popt_ref[1]))/config_file['expected_thickness_per_channel'][channel_number] * 100 
+            print("Channel "+str(channel_number)+" eff. thickness: (%.2f±%.2f(stat)) um, deviation from expected value:%.2f%%" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1]), dev_from_expected))
 
-            print(str(channel_number), popt_ref[1], perr_ref[1], mpv_systs_up[-1], mpv_systs_down[-1], _mpv_to_thickness(popt_ref[1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1]), file=result_file)
+
+            print(str(channel_number), popt_ref[1], perr_ref[1], mpv_systs_up[-1], mpv_systs_down[-1], _mpv_to_thickness(popt_ref[1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1]), dev_from_expected, file=result_file)
 
             fig = plt.figure(1)
             ax = plt.gca()
