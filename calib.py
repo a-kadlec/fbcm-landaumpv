@@ -68,23 +68,29 @@ def get_ASIC_calibration(data, sample, config_file):
     # check what calibrations to calculate
     bCalibLog = False
     bCalibSpline = False
-    if isinstance(config_file['calibration_types'], str):
-        bCalibLog = "log" in config_file['calibration_types']
-        bCalibSpline = "spline" in config_file['calibration_types']
-    elif isinstance(config_file['calibration_types'], list):
-        for string in config_file['calibration_types']:
+    bCalibLinear = False
+    if isinstance(config_file['tested_calibration_types'], str):
+        bCalibLog = "log" in config_file['tested_calibration_types']
+        bCalibSpline = "spline" in config_file['tested_calibration_types']
+        bCalibLinear = "linear" in config_file['tested_calibration_types']
+    elif isinstance(config_file['tested_calibration_types'], list):
+        for string in config_file['tested_calibration_types']:
             if "log" in string:
                 bCalibLog = True
             if "spline" in string:
                 bCalibSpline = True
+            if "linear" in string:
+                bCalibLinear = True
 
     # sanity check
-    if not bCalibSpline and not bCalibLog:
+    if not bCalibSpline and not bCalibLog and not bCalibLinear:
         raise Exception("Error: No calibration type specified, check your config file.")
-    if config_file['used_calibration_type'] == "log" and not bCalibLog:
+    if config_file['selected_calibration_type'] == "log" and not bCalibLog:
         raise Exception("Error: You're trying to use log calibration for the histogram data, but did not specify log as an option for the calibration data. Check your config file.")
-    if config_file['used_calibration_type'] == "spline" and not bCalibSpline:
+    if config_file['selected_calibration_type'] == "spline" and not bCalibSpline:
         raise Exception("Error: You're trying to use spline calibration for the histogram data, but did not specify spline as an option for the calibration data. Check your config file.")
+    if config_file['selected_calibration_type'] == "linear" and not bCalibLinear:
+        raise Exception("Error: You're trying to use linear interpolation calibration for the histogram data, but did not specify linear interpolation as an option for the calibration data. Check your config file.")
 
 
 
@@ -109,6 +115,7 @@ def get_ASIC_calibration(data, sample, config_file):
     output = {}
     output['fitparams'] = []
     output['spline'] = []
+    output['linear'] = []
     output['RC'] = []
     output['th'] = []
     output['channel'] = []
@@ -126,8 +133,15 @@ def get_ASIC_calibration(data, sample, config_file):
     tot_summary_text = []
     tot_summary_params = []
     tot_summary_fitchcalval = []
+    tot_summary_linear = []
+    tot_summary_spline = []
+
     #for testboard_channel in test_conditions['channels']:
     for asic_channel, testboard_channel in zip(asic_channels,testboard_channels):
+
+        if testboard_channel in config_file['skip_channels']:
+            print(f"Config file info: skipping channel {testboard_channel} from calibration")
+            continue
 
         toa =     results['toa'][testboard_channel].copy()
         tot =     results['tot'][testboard_channel].copy()
@@ -170,7 +184,8 @@ def get_ASIC_calibration(data, sample, config_file):
 
                 fig = plt.figure(2)
                 ax = fig.add_axes([0,0,1,1])
-                ax.set_title('Timing scan (S: %s, CH: %s, RC=%x, th=%.2f fC)' % (sample, testboard_channel, test_conditions['rccal'][r], test_conditions['th_list_fC'][th_level_fC]))
+                ax.set_title("FBCM", loc="left")
+                ax.set_title('CH: %s, RC=%x, th=%.2f fC' % (testboard_channel, test_conditions['rccal'][r], test_conditions['th_list_fC'][th_level_fC]), loc="right")
                 ax.set_ylabel('Time [ns]')
                 ax.set_xlabel('Input charge [fC]')
                 # start = np.argmin(err[r,0:256:step])*step # find first False what means first valid value
@@ -207,13 +222,47 @@ def get_ASIC_calibration(data, sample, config_file):
                 else:
                     sigma = np.array( [1] * len(myTot) )
                 
-                #for sig in sigma:
-                #    print(sig)
 
+
+                xvalues_filtered = []
+                myTot_filtered = []
+                sigma_filtered = []
+
+                xvalues_off = []
+                myTot_off = []
+                sigma_off = []
+
+                for i_tot in range(len(myTot)):
+                    if myTot[i_tot] > 0 and abs(sigma[i_tot]) <= config_file['calib_bad_point_errorlimit_ns']:
+                        xvalues_filtered.append(xvalues[i_tot])
+                        myTot_filtered.append(myTot[i_tot])
+                        sigma_filtered.append(sigma[i_tot])
+                    else:
+                        xvalues_off.append(xvalues[i_tot])
+                        myTot_off.append(myTot[i_tot])
+                        sigma_off.append(sigma[i_tot])
                 
 
+                if len(myTot_filtered) == 0:
+                    print("No valid data points left after filtering zeros and outliers in ToT values.")
+                    continue
+                    
+                bMatchingSetupForChannel = test_conditions['th_list_fC'][th_level_fC] == config_file['threshold_per_channel'][testboard_channel] and test_conditions['rccal'][r] == config_file['RC']
+
+
+                if bMatchingSetupForChannel:
+                    tot_summary.append( myTot_filtered.copy())
+                    tot_summary_x.append( xvalues_filtered.copy())
+                    tot_std_summary.append(sigma_filtered.copy())
+                    tot_summary_text.append({'ch': testboard_channel, 'th': config_file['threshold_per_channel'][testboard_channel]}  )
+
+
                 if bCalibLog:
-                    popt, pcov = curve_fit(tot_func, xvalues, myTot, p0=config_file['log_p0'], sigma = sigma, absolute_sigma = True)
+                    try:
+                        popt, pcov = curve_fit(tot_func, xvalues_filtered, myTot_filtered, p0=config_file['log_p0'], sigma=sigma_filtered, absolute_sigma=True)
+                    except RuntimeError as e:
+                        print(f"Fit failed for data: xvalues={xvalues_filtered}, myTot={myTot_filtered}, p0={config_file['log_p0']}, RC={test_conditions['rccal'][r]}, channel={testboard_channel}")
+                        raise e
 
                     Nexp = tot_func(xvalues, *popt)
                     Ndif = myTot - Nexp
@@ -225,21 +274,26 @@ def get_ASIC_calibration(data, sample, config_file):
                     fit_chcalval = np.arange(0.6e-15, mychcalval[-1], (mychcalval[1]-mychcalval[0])/10)*1e15
                     fit_tot = tot_func(fit_chcalval, *popt)
 
-                    if test_conditions['th_list_fC'][th_level_fC] == config_file['threshold_per_channel'][testboard_channel] and test_conditions['rccal'][r] == config_file['RC']:
-                        tot_summary.append( myTot.copy())
-                        tot_summary_x.append( xvalues.copy())
-                        tot_std_summary.append(sigma.copy())
-                        tot_summary_text.append({'ch': testboard_channel, 'th': config_file['threshold_per_channel'][testboard_channel]}  )
+                    if bMatchingSetupForChannel:
                         tot_summary_params.append(popt.copy())
                         tot_summary_fitchcalval.append(fit_chcalval.copy())
 
+                if bCalibLinear:
+                    from scipy.interpolate import interp1d
+
+                    interp_result = interp1d(xvalues_filtered, myTot_filtered, fill_value="extrapolate")
+                    interp_inverse = interp1d(myTot_filtered, xvalues_filtered , fill_value="extrapolate")
+
+                    if bMatchingSetupForChannel:
+                        tot_summary_linear.append(interp_result)
+
+                    output['linear'].append(interp_inverse)
 
                 if bCalibSpline:
                     from scipy.interpolate import CubicSpline
-                    splinex = chcalval[start:end:step]*1e15
-                    spliney = tot[r,th_level_fC,start:end:step]*1e9
+                    splinex = xvalues_filtered
+                    spliney = myTot_filtered
                     splinefit = CubicSpline(splinex, spliney)
-                    x_range = np.linspace(splinex[0], splinex[-1],1000)
 
                     from scipy.interpolate import splrep, BSpline
                     smoothing = config_file['spline_smoothing_param']
@@ -268,13 +322,21 @@ def get_ASIC_calibration(data, sample, config_file):
 
                     tck_s_inv = splrep(invsplx, invsply, s=smoothing)
 
+
+                    if bMatchingSetupForChannel:
+                        tot_summary_spline.append(tck_s)
+
                     output['spline'].append(tck_s_inv)
                 #print(chcalval[start]*1e15)
                 #ax.plot(chcalval[start:end:step]*1e15, toa[r,start:end:step]*1e9, 'sr', label='ToA')
 
-                ax.plot(xvalues, myTot, 'sb', label='ToT')
+                ax.plot(xvalues_filtered, myTot_filtered, 'sb', label='ToT')
                 if bUseSigma:
-                    ax.errorbar(xvalues, myTot, yerr=sigma, capsize=3, fmt=".", ecolor = "black")
+                    ax.errorbar(xvalues_filtered, myTot_filtered, yerr=sigma_filtered, capsize=3, fmt=".", ecolor = "black")
+
+                if xvalues_off:
+                    ax.errorbar(xvalues_off, myTot_off, yerr=sigma_off, capsize=3, fmt="x", ecolor = "black", color="black")
+                
                 ax.plot(xvalues, tw[r,th_level_fC,start:end:step]*1e9, 'or', label='TW')
 
                 goodlim_x = ax.get_xlim()
@@ -285,11 +347,15 @@ def get_ASIC_calibration(data, sample, config_file):
                 #    params.append("%.2f ± %.2f" % (pfit[0][i], perr[i])   )
 
                 if bCalibLog:
-                    params = ["%.2f" % p for p in popt]
-                    ax.plot(fit_chcalval, fit_tot, 'g', label='ToT fit %s' %  params +r", $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf))
-                #ax.plot(x_range, splinefit(x_range), 'orange', label='ToT spline')
+                    #params = ["%.2f" % p for p in popt]
+                    ax.plot(fit_chcalval, fit_tot, 'g', label=r"Log fit, $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf))    
+                    #'Log fit %s' %  params +r      doesn't make much sense to print params (doesn't mean anything without errors, but also not printing errors due to space on plot...)
+
+                x_range = np.linspace(goodlim_x[0], goodlim_x[1],1000)
                 if bCalibSpline:
-                    ax.plot(x_range, BSpline(*tck_s)(x_range), 'purple', label=f'ToT spline (s={smoothing})'+r", $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf_sp))
+                    ax.plot(x_range, BSpline(*tck_s)(x_range), 'purple', label=f'Cubic spline (smoothing={smoothing})'+r", $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf_sp))
+                if bCalibLinear:
+                    ax.plot(x_range, interp_result(x_range), 'darkorange', label="Linear interpolation")
 
                 ax.set_xlim(goodlim_x)
                 ax.set_ylim(goodlim_y)
@@ -308,6 +374,8 @@ def get_ASIC_calibration(data, sample, config_file):
         "tot_summary_params": tot_summary_params,
         "tot_summary_text": tot_summary_text,
         "fit_chcalval": tot_summary_fitchcalval,
+        "tot_summary_linear": tot_summary_linear,
+        "tot_summary_spline": tot_summary_spline,
     }
     return output, tot_summary
 
@@ -356,30 +424,84 @@ def get_board_calibration(config_file):
         for key in tot_summary.keys():
             tot_summary[key].extend(tot_summary_left[key])
 
-    fig = plt.figure(2, figsize=(15, 10))
-    ax = fig.add_subplot(111)
-    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
-    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
-    ax.set_title(f"Timing scan summary of board{config_file['board_number']}, RC{config_file['RC']}")
-    ax.set_xlabel('Input charge [fC]')
-    ax.set_ylabel('Time [ns]')
-    for i in range(len(tot_summary['tot_summary'])):
-        ax.plot(tot_summary['tot_summary_x'][i], tot_summary['tot_summary'][i], 's', color=colors[i])
-        ax.errorbar(tot_summary['tot_summary_x'][i], tot_summary['tot_summary'][i], yerr=tot_summary['tot_std_summary'][i], capsize=3, fmt=".", ecolor = colors[i], color=colors_dots[i], label="Ch"+str(tot_summary['tot_summary_text'][i]['ch'])+", th="+str(tot_summary['tot_summary_text'][i]['th'])+" fC")
-    goodlim_x = ax.get_xlim()
-    goodlim_y = ax.get_ylim()
-    for i in range(len(tot_summary['tot_summary'])):
-        ax.plot(tot_summary['fit_chcalval'][i], tot_func(tot_summary['fit_chcalval'][i], *tot_summary['tot_summary_params'][i]) , colors[i])
-    ax.set_xlim(goodlim_x)
-    ax.set_ylim(goodlim_y)
-    ax.set_xticks(np.arange(round(goodlim_x[0]),round(goodlim_x[1]),0.5))
-    ax.set_xticks(np.arange(round(goodlim_x[0]),round(goodlim_x[1]),0.1),minor=True)
-    ax.grid(linestyle = "-")
-    ax.grid(linestyle = "--", which='minor')
-    ax.legend(loc='best', prop={'size': 10})  # bbox_to_anchor=(0, 0, 0.9, 0.9)
-    fig.savefig(config_file['output_dir']+'/calib_plots/tot_tw_sample_%s_rccal_%d_summary.jpg' % (sample, config_file['RC']), format='jpg', bbox_inches='tight')
-    plt.close()
-    #print(output)
+    if config_file['channels_on_calib_summary_plots']:
+
+        valid_channels = [i for i in range(6) if i not in config_file['skip_channels']]
+        # f.e. if skipping 3,4: [0,1,2,5]
+
+        for i_plot in range(len(config_file['channels_on_calib_summary_plots'])):
+
+            if any(i in config_file['channels_on_calib_summary_plots'][i_plot] for i in config_file['skip_channels']):
+                print(f"Warning: Channel requested on calibration summary plot is also marked for skipping. Check your config file! Skipping this plot.")
+                continue
+
+            # config_file['channels_on_calib_summary_plots'][i_plot] has actual indices for channels. However, tot_summary is indexed from 0 sequentially. We need to reindex based on the missing channels
+            channels_for_plot_reindexed_by_missing = []
+            for acutal_channel_index in config_file['channels_on_calib_summary_plots'][i_plot]:
+                channels_for_plot_reindexed_by_missing.append( valid_channels.index(acutal_channel_index) )
+
+
+            # threshold equality check  (if not, put each in legend, if all equal, just write it once)
+            th_eq = tot_summary['tot_summary_text'][   channels_for_plot_reindexed_by_missing[0]    ]['th']
+            for i in channels_for_plot_reindexed_by_missing:
+                if tot_summary['tot_summary_text'][i]['th'] != th_eq:
+                    th_eq = False
+                    break
+
+            fig = plt.figure(2, figsize=(15, 10))
+            ax = fig.add_subplot(111)
+            colors=["blue","darkred","black","darkgreen","purple","darkorange"]
+            colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
+            ax.set_title("FBCM", loc="left")
+            ax.set_title(f"board{config_file['board_number']}, RC{config_file['RC']}", loc="right")
+            ax.set_xlabel('Input charge [fC]')
+            ax.set_ylabel('Time [ns]')
+            for i in channels_for_plot_reindexed_by_missing:
+                label_i = "Channel "+str(tot_summary['tot_summary_text'][i]['ch'])
+                if not th_eq:
+                    label_i += ", threshold: "+str(tot_summary['tot_summary_text'][i]['th'])+" fC"
+                ax.plot(tot_summary['tot_summary_x'][i], tot_summary['tot_summary'][i], 's', color=colors[valid_channels[i]])
+                ax.errorbar(tot_summary['tot_summary_x'][i], tot_summary['tot_summary'][i], yerr=tot_summary['tot_std_summary'][i], capsize=3, fmt=".", ecolor = colors[valid_channels[i]], color=colors_dots[valid_channels[i]], label=label_i) 
+            goodlim_x = ax.get_xlim()
+            goodlim_y = ax.get_ylim()
+            for i in channels_for_plot_reindexed_by_missing:
+                if "log" in config_file['selected_calibration_type']:
+                    ax.plot(tot_summary['fit_chcalval'][i], tot_func(tot_summary['fit_chcalval'][i], *tot_summary['tot_summary_params'][i]) , colors[valid_channels[i]])
+
+                if "linear" in config_file['selected_calibration_type']:
+                    x_range = np.linspace(goodlim_x[0], goodlim_x[1],1000)
+                    ax.plot(x_range, tot_summary['tot_summary_linear'][i](x_range) , colors[valid_channels[i]])
+
+                if "spline" in config_file['selected_calibration_type']:
+                    x_range = np.linspace(goodlim_x[0], goodlim_x[1],1000)
+                    ax.plot(x_range, tot_summary['tot_summary_spline'][i](x_range) , colors[valid_channels[i]])
+
+
+            current_xtics_major = ax.get_xticks()
+            current_ytics_major = ax.get_yticks()
+            ax.set_xticks(np.arange(current_xtics_major[0],current_xtics_major[-1],1))
+            ax.set_xticks(np.arange(current_xtics_major[0],current_xtics_major[-1],config_file['summary_plots_xticks_density']),minor=True)
+            ax.set_yticks(np.arange(current_ytics_major[0],current_ytics_major[-1],1)) #,minor=True)
+
+            ax.grid(linestyle = "-")
+            ax.grid(linestyle = "--", which='minor')
+
+            ax.set_xlim(goodlim_x)
+            ax.set_ylim(goodlim_y)
+
+            if th_eq:
+                ax.legend(title="Threshold: "+str(th_eq)+" fC",loc='best')
+            else:
+                ax.legend(loc='best') #, prop={'size': 10})  # bbox_to_anchor=(0, 0, 0.9, 0.9)
+
+            fnameindex = "ch"+str( config_file['channels_on_calib_summary_plots'][i_plot][0] )
+            for j in range(1,len(config_file['channels_on_calib_summary_plots'][i_plot]),1):
+                fnameindex += "-"+str(config_file['channels_on_calib_summary_plots'][i_plot][j])
+
+            fig.savefig(config_file['output_dir']+'/calib_plots/tot_tw_sample_%s_rccal_%d_summary_%s.jpg' % (sample, config_file['RC'], fnameindex), format='jpg', bbox_inches='tight')
+            plt.close()
+
+    
     return output
 
 

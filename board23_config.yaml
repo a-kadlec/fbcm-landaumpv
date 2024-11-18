@@ -13,11 +13,16 @@ histogram_data_files: [569, 573, 574, 576, 577]
 RC: 3
 threshold_per_channel: [0.7,0.7,0.7,0.7,0.7,0.7]
 expected_thickness_per_channel: [150,150,150,150,150,150]  # in micrometer FIXME: update values for board 23
+skip_channels: [] # list of channel numbers to skip
 
-# The types of calibration curves to fit onto the calibration data plots. Can be "log" and "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
-calibration_types: "log"
-# The calibration type to select to prepare the histogram data for the fit. Can be "log" OR "spline", not both
-used_calibration_type: "log"
+# The types of calibration curves to fit onto the calibration data plots. Can be "log", "linear", "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
+tested_calibration_types: "log, linear"
+# The calibration type to select to prepare the histogram data for the fit. Can be "log" OR "spline" OR "linear", not a list
+selected_calibration_type: "log"
+calib_bad_point_errorlimit_ns: 3
+channels_on_calib_summary_plots: [[0,1,2,3,4,5],[2,3],[4,5]]
+summary_plots_xticks_density: 0.2
+
 
 # An upper cutoff in ns for the raw tot plot
 cutoff_ns: 25

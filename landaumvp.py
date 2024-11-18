@@ -15,6 +15,7 @@ import math
 import glob
 import warnings
 from scipy.interpolate import BSpline
+from scipy.integrate import simpson
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -50,7 +51,7 @@ def main(argv: list[str] = sys.argv[1:]):
     #print("Common Charge plot [log vs pline calib]...")
     #landaumvp_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit.png", config_file, calibration, "both")
     print("Refined Landau plot...")
-    landaumvp_refined_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_TH{config_file['threshold_per_channel']}.png", config_file, calibration, config_file['used_calibration_type'])
+    landaumvp_refined_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_TH{config_file['threshold_per_channel']}.png", config_file, calibration)
 
 
 def get_histograms(data: bytes, timestamps: list = []) -> dict[str, list]:
@@ -182,8 +183,8 @@ def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
     fig = plt.figure(1, figsize=(15, 10))
     ax = fig.add_subplot(111)
     ax.set_title(f"ToT distribution summary of board{config_file['board_number']} RC"+str(config_file['RC']))
-    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
-    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
+    colors=["blue","darkred","black","darkgreen","purple","darkorange"]
+    colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
 
     cutoff = config_file['cutoff_ns']
     axs = []
@@ -256,17 +257,16 @@ def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
 
 
 
-def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, calibration, calib_type = "log"):
+def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, calibration):
 
+    calib_type = config_file['selected_calibration_type']
 
     fig = plt.figure(1, figsize=(15, 10))
     ax = fig.add_subplot(111)
     ax.set_title(f"Amplitude Spectrum summary of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
-    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
-    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
+    colors=["blue","darkred","black","darkgreen","purple","darkorange"]
+    colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
 
-
-    cutoff = config_file['cutoff_ns']
     axs = []
     bottom_axs = []
     fig = plt.figure(2, tight_layout=True, figsize=(15, 10))
@@ -281,8 +281,10 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
     mpv_errs = []
     mpv_systs_up = []
     mpv_systs_down = []
+
+    missing_channels = []
     with open(config_file['output_dir']+"/results_board"+str(config_file['board_number'])+"_"+config_file['measurement']+".dat", "w") as result_file:
-        print("#Channel number | MPV [fC] | MPV stat [fC] | MPV syst up [fC] | MPV syst down [fC] | d_eff [um] | d_eff stat+syst up [um] | d_eff stat+syst down [um] | dev. from expected d_eff (%)", file=result_file)
+        print("#Channel number | ToT Integral | MPV [fC] | MPV stat [fC] | MPV syst up [fC] | MPV syst down [fC] | d_eff [um] | d_eff stat+syst up [um] | d_eff stat+syst down [um] | dev. from expected d_eff (%)", file=result_file)
 
 
         for channel_number in range(len(y_axes_data)):
@@ -291,13 +293,26 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             ax = axs[channel_number]
             bin_width = time_bins[-1]/len(time_bins)
 
-            if cutoff:
+            if config_file['cutoff_ns']:
                 for i in range(len(time_bins)):
-                    if time_bins[i] > cutoff:
+                    if time_bins[i] > config_file['cutoff_ns']:
                         time_bins = time_bins[:i]
-                        y_axis[:i]
+                        y_axis = y_axis[:i]
                         break
         
+            ax.set_title(f"Channel {channel_number}, th: {config_file['threshold_per_channel'][channel_number]} fC")
+
+            # Calculate integral of raw tot plot
+            # simson parameters: simpson(y, *, x=None, dx=1.0, axis=-1)
+            tot_integral = simpson(y_axis, x=time_bins)
+
+            if channel_number in config_file['skip_channels']:
+                print(f"Config file info: skipping channel {channel_number}")
+                missing_channels.append(channel_number)
+                ax.plot([], [], label="Channel skipped!") 
+                ax.legend(loc='center', handletextpad=0, handlelength=0)
+                continue
+
 
             # Conversion of x axis to fc
             # find calib for this setup
@@ -305,17 +320,24 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
                 if calibration['th'][calib_i] == config_file['threshold_per_channel'][channel_number]  and calibration['RC'][calib_i] == config_file['RC'] and calibration['channel'][calib_i] == channel_number:
                     break
             else: # no break happened
-                raise Exception(f"Error: calibration not found for channel {channel_number}, RC {config_file['RC']}, threshold {config_file['threshold_per_channel'][channel_number]}.")
+                print(f"Error: calibration not found for channel {channel_number}, RC {config_file['RC']}, threshold {config_file['threshold_per_channel'][channel_number]}, skipping channel")
+                missing_channels.append(channel_number)
+                ax.plot([], [], label="Calibration not found!") 
+                ax.legend(loc='center', handletextpad=0, handlelength=0)
+                continue
+
 
             if calib_type == "log":
                 fc_bins = calib.invert_tot_func(time_bins, *calibration['fitparams'][calib_i])
+            if calib_type == "linear":
+                fc_bins = calibration['linear'][calib_i](time_bins)
             if calib_type == "spline":
                 fc_bins = BSpline(*calibration['spline'][calib_i])(time_bins)
 
             for i in range(len(fc_bins)):
                 if fc_bins[i] > 0:  # to remove nans
                     fc_bins = fc_bins[i:]
-                    y_axis[i:]
+                    y_axis = y_axis[i:]
                     break
 
             for i in range(len(fc_bins)):
@@ -420,9 +442,13 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             leg = ax.legend(loc='best', prop={'size': 11}, handletextpad=0, handlelength=0)
             #for item in leg.legendHandles:
             #    item.set_visible(False)
-            fig.suptitle(f"Landau Distribution fits to Amplitude Spectrum of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
+            calib_text = {
+                "log": "logarithmic fit",
+                "spline": "cubic spline interpolation",
+                "linear": "linear interpolation"
+            }
+            fig.suptitle(f"FBCM - board{config_file['board_number']}, RC{config_file['RC']}, used calibration: {calib_text[calib_type]}",horizontalalignment="left",x = 0.05)
 
-            ax.set_title(f"Channel {channel_number}, th: {calibration['th'][calib_i]} fC")
             ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 2.0))
             ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 1.0), minor=True)
             ax.set_ylabel(f"Count")
@@ -433,7 +459,7 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             print("Channel "+str(channel_number)+" eff. thickness: (%.2f±%.2f(stat)) um, deviation from expected value:%.2f%%" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1]), dev_from_expected))
 
 
-            print(str(channel_number), popt_ref[1], perr_ref[1], mpv_systs_up[-1], mpv_systs_down[-1], _mpv_to_thickness(popt_ref[1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1]), dev_from_expected, file=result_file)
+            print(str(channel_number), tot_integral, popt_ref[1], perr_ref[1], mpv_systs_up[-1], mpv_systs_down[-1], _mpv_to_thickness(popt_ref[1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1]), dev_from_expected, file=result_file)
 
             fig = plt.figure(1)
             ax = plt.gca()
@@ -460,34 +486,48 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
 
 
     # Summary plot
-    fig = plt.figure(3, figsize=(7, 5))
+    fig = plt.figure(3, figsize=(7, 5), tight_layout=True)
+    axeslimit_default = plt.rcParams['axes.autolimit_mode']
+    plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
     ax = fig.add_subplot(111)
-    ax.set_title(f"Summary plot of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
+    ax.set_title("FBCM",loc="left")
+    ax.set_title(f"board{config_file['board_number']}, RC{config_file['RC']}",loc="right")
     ax.set_xlabel('Threshold [fC]')
     ax.set_ylabel('MPV [fC]')
-    colors=["blue","crimson","darkorange","black","darkgreen","purple"]
-    colors_dots=['dodgerblue',"red","orange","grey","green","magenta"]
-    for i in range(len(config_file['threshold_per_channel'])):
+    colors=["blue","darkred","black","darkgreen","purple","darkorange"]
+    colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
+
+    valid_channels = [i for i in range(6) if i not in missing_channels]
+
+    for i in range(len(valid_channels)):
         #asymmetric_error = np.array(list(zip(mpv_errs[i]+mpv_systs_down[i], mpv_errs[i]+mpv_systs_up[i]))).T
         asymmetric_error = [[mpv_errs[i]+mpv_systs_down[i]], [mpv_errs[i]+mpv_systs_up[i]]]
 
         ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=asymmetric_error, capsize=3, fmt=".", ecolor = "black", color="black")
-        ax.plot(config_file['threshold_per_channel'][i], mpvs[i], 's', color=colors[i])
-        ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=mpv_errs[i], capsize=3, fmt=".", ecolor = colors[i], color=colors_dots[i], label="Channel "+str(i))
+        ax.plot(config_file['threshold_per_channel'][i], mpvs[i], 's', color=colors[valid_channels[i]])
+        ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=mpv_errs[i], capsize=3, fmt=".", ecolor = colors[valid_channels[i]], color=colors_dots[valid_channels[i]], label="Channel "+str(valid_channels[i]))
 
     ax.grid(linestyle = "--")
-    ax.legend(loc='best', prop={'size': 11})
+
+
+    yticks_major = np.array(ax.get_yticks())
+    ax.set_ylim(yticks_major[0],yticks_major[-1])
 
     y1, y2 = ax.get_ylim()
     x1, x2 = ax.get_xlim()
+
     ax2 = ax.twinx()
     ax2.set_ylim(_mpv_to_thickness(y1),_mpv_to_thickness(y2))
-    ax2.set_yticks( range(int(_mpv_to_thickness(y1)), int(_mpv_to_thickness(y2)), (int((_mpv_to_thickness(y2) - _mpv_to_thickness(y1))/15))))
+    ax2.set_yticks( _mpv_to_thickness(yticks_major))
     ax2.tick_params(axis="y", which = 'major', labelsize=10)
-    ax2.set_ylabel(r"$d_{eff}$ [$\mu$m]", fontsize = 11)
+    ax2.set_ylabel(r"$d_{eff}$ [$\mu$m]", fontsize = 14)
     ax2.set_xlim(x1,x2)
 
-    fig.savefig(config_file['output_dir']+f"/MPV_th_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
+
+    ax.legend(loc='best', prop={'size': 11})
+
+    fig.savefig(config_file['output_dir']+f"/MPV_th_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_{calib_type}-calib.png")
+    plt.rcParams['axes.autolimit_mode'] = axeslimit_default
 
 
 
@@ -529,10 +569,12 @@ def landaumvp_fit(x_axes_data, y_axes_data, output_file, config_file, calibratio
 
         if calib_type == "log":
             fc_bins = calib.invert_tot_func(time_bins, *calibration['fitparams'][calib_i])
-        if calib_type == "spline":
+        elif calib_type == "spline":
             fc_bins = BSpline(*calibration['spline'][calib_i])(time_bins)
+        elif calib_type == "linear":
+                fc_bins = calibration['linear'][calib_i](time_bins)
         else:
-            # do both
+            # do both spline and log
             fc_bins = calib.invert_tot_func(time_bins, *calibration['fitparams'][calib_i])
             fc_bins2 = BSpline(*calibration['spline'][calib_i])(time_bins)
             y_axis2 = y_axis.copy()

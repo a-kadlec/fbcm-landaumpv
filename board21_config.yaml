@@ -13,18 +13,23 @@ histogram_data_files: "histogram_data_run_standalone_th_scan_0.900_2024-07-28_16
 RC: 3
 threshold_per_channel: [0.9,0.9,0.9,0.9,0.9,0.9]
 expected_thickness_per_channel: [150,150,150,150,150,150]  # in micrometer
+skip_channels: [] # list of channel numbers to skip
 
-# The types of calibration curves to fit onto the calibration data plots. Can be "log" and "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
-calibration_types: "log"
-# The calibration type to select to prepare the histogram data for the fit. Can be "log" OR "spline", not both
-used_calibration_type: "log"
+# The types of calibration curves to fit onto the calibration data plots. Can be "log", "linear", "spline", or comma separated list (f.e. "log,spline" or ["log","spline"] if you want both on the calib plots)
+tested_calibration_types: "log, linear"
+# The calibration type to select to prepare the histogram data for the fit. Can be "log" OR "spline" OR "linear", not a list
+selected_calibration_type: "log"
+calib_bad_point_errorlimit_ns: 3
+channels_on_calib_summary_plots: [[0,1,2,3,4,5],[2,3],[4,5]]
+summary_plots_xticks_density: 0.2
+
 
 # An upper cutoff in ns for the raw tot plot
 cutoff_ns: 25
 # An upper cutoff in fC for the initial Landau fit 
-cutoff_fC: 8
+cutoff_fC: 4
 # A cutoff in percent (%) for the refined Landau fit: if a point has a larger relative deviation to the initial fit than this value, it is ignored in the refined fit
-cutoff_ref: 15
+cutoff_ref: 40
 # A lower cutoff to study the effect of near-0 points for the refined fit on the left tail. Separate for each channel, number specifies number of omitted points from the left of the x-axis.
 cutoff_lower: [0,0,0,0,0,0]
 
