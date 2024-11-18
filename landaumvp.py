@@ -17,6 +17,13 @@ import warnings
 from scipy.interpolate import BSpline
 from scipy.integrate import simpson
 
+
+calib_text = {
+    "log": "logarithmic fit",
+    "spline": "cubic spline interpolation",
+    "linear": "linear interpolation"
+}
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument('configfile_name')
@@ -182,7 +189,8 @@ def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
 
     fig = plt.figure(1, figsize=(15, 10))
     ax = fig.add_subplot(111)
-    ax.set_title(f"ToT distribution summary of board{config_file['board_number']} RC"+str(config_file['RC']))
+    ax.set_title(f"FBCM", loc="left")
+    ax.set_title(f"board{config_file['board_number']}, RC"+str(config_file['RC']), loc="right")
     colors=["blue","darkred","black","darkgreen","purple","darkorange"]
     colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
 
@@ -220,7 +228,7 @@ def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
         ax.plot(time_bins, y_axis, 'sb')
         ax.errorbar(time_bins, y_axis, yerr=errorbars, capsize=3, fmt=".", ecolor = "black")
 
-        fig.suptitle(f"ToT distribution of board{config_file['board_number']} RC"+str(config_file['RC']))
+        fig.suptitle(f"FBCM - board{config_file['board_number']}, RC{config_file['RC']}",horizontalalignment="left",x = 0.05)
         ax.set_title(f"Channel {channel_number}, th: {config_file['threshold_per_channel'][channel_number]} fC")
         ax.set_xticks(np.arange(math.floor(min(time_bins)), math.ceil(max(time_bins)), 4.0))
         ax.set_xticks(np.arange(math.floor(min(time_bins)), math.ceil(max(time_bins)), 2.0), minor=True)
@@ -263,7 +271,8 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
 
     fig = plt.figure(1, figsize=(15, 10))
     ax = fig.add_subplot(111)
-    ax.set_title(f"Amplitude Spectrum summary of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
+    ax.set_title("FBCM", loc="left")
+    ax.set_title(f"board{config_file['board_number']}, RC{config_file['RC']}, used calibration: {calib_text[calib_type]}", loc="right")
     colors=["blue","darkred","black","darkgreen","purple","darkorange"]
     colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
 
@@ -442,11 +451,6 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             leg = ax.legend(loc='best', prop={'size': 11}, handletextpad=0, handlelength=0)
             #for item in leg.legendHandles:
             #    item.set_visible(False)
-            calib_text = {
-                "log": "logarithmic fit",
-                "spline": "cubic spline interpolation",
-                "linear": "linear interpolation"
-            }
             fig.suptitle(f"FBCM - board{config_file['board_number']}, RC{config_file['RC']}, used calibration: {calib_text[calib_type]}",horizontalalignment="left",x = 0.05)
 
             ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 2.0))
@@ -479,7 +483,7 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
     ax = plt.gca()
     ax.set_ylabel(f"Count [Max normalized to 1]")
     ax.set_xlabel("Charge [fC]")
-    ax.legend(loc='best', prop={'size': 10})
+    ax.legend(loc='best', prop={'size': 12})
     ax.grid(linestyle = "--")
     fig.savefig(config_file['output_dir']+f"/tot_fc_fit_refined_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
     plt.close(fig)
