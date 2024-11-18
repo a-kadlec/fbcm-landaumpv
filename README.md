@@ -47,9 +47,14 @@ To run the code, first you need to edit and set up the board configuration yaml 
 * histogram_data_files: (string/int/list) The name of the histogram data file, or a list of files (the contents of which will be summed). The full file name can be specified as a string (f.e. "histogram_data_run_538_2024-07-26_07-27-05.dat"), or for convenience, it is enough to specify only the run number (f.e. 538). This is convenient if you want to use a list of files, for example from run 512 to 516, then this can be [512,513,514,515,516].
 * RC: (integer) The RC setting that was used while taking the histogram data
 * threshold_per_channel: (list[6]) The threshold values for each channel that was used while taking the histogram data
+* expected_thickness_per_channel: (list[6]) The expected values for the effective thickness for each channel respectively - the deviation of the results w.r.t. these values will be calculated.
+* skip_channels: (list) If a channel number is included in this list, it will be skipped from the analysis. Useful to ignore known noisy channels. Empty list ([]) means none of the channels are skipped, all are analyzed.
 
-* calibration_types: (string): The types of calibration to test and draw on the calibration data. This can be "log" for only a logarithmic fit, "spline" for only interpolation with a smoothed cubic spline, or "log, spline" for both.
-* used_calibration_type: (string) The calibration to select for usage on the histogram data. Can be "log" or "spline".
+* tested_calibration_types: (string): The types of calibration to test and draw on the calibration data. This can be "log" for a logarithmic fit, "spline" for interpolation with a smoothed cubic spline, or "linear" for linear interpolation. It can also be a combination of any of these, for example "log, linear" to test both log fit and linear interpolation.
+* selected_calibration_type: (string) The calibration to select for usage on the histogram data. This cannot be any sort of list! One type of calibration must be selected.
+* calib_bad_point_errorlimit_ns: (float) A threshold for the sigma of the measurement points in the calibration data: if a point has higher sigma than this, it is ignored from the calibration fit.
+* channels_on_calib_summary_plots: (2D list) This setting specifies which channels are shown on which summary plot. The first index denotes how many plots to make, and the second index contains which channels are on the plot. For example: [[0,3],[2,4,5]] will make two plots, the first one will show channels 0 and 3, and the second one will show channels 2, 4, and 5. Any number of plots can be made with any number of channels.
+* summary_plots_xticks_density: (float) The density of the xticks marks on the x axis for all calibration summary plots. Can be decreased for a cleaner plot, or can be increased to help see differences when comparing nearly identical channels.
 
 * cutoff_ns: (float) This is an upper cut on the x-axis of the raw ToT plot in nanoseconds: any data that belongs to a time bin larger than this value will not be plotted.
 * cutoff_fC: (float) This is an upper cut on the x-axis of the landau plot in fC (after calibration has been applied to the x-axis): similarly, any data that belongs to a higher fC bin than this value is not plotted, and is not considered in the initial Landau fit.
