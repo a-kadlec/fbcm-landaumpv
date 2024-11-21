@@ -9,6 +9,7 @@ Alternatively, you can download the files by clicking the green "<> Code" button
 These need to be installed in your pyenv.
 1) landaupy: https://github.com/SengerM/landaupy 
 2) pyyaml: https://pypi.org/project/PyYAML/
+3) mplhep: https://mplhep.readthedocs.io/en/latest/
 
 
 # How it works
@@ -37,7 +38,8 @@ To run the code, first you need to edit and set up the board configuration yaml 
 <details>
 <summary>Details of the config keys</summary>
   
-* board_number: (integer) the board number of the currently analyzed board 
+* board_number: (integer) the board number of the currently analyzed board
+* color_palette: (str) Specify the used color palatte. Can be "cms" for the 10-color M. Petroff scheme, "cms6" for the 6-color M.Petroff scheme, or "custom" for the legacy custom colors.
 * output_dir: (string) the directory where the output plots and files should be created. If the path does not already exist, the code will attempt to create it
 * measurement: (string) a descriptive name for the measurement that will be concated to the board number in file names. Should reflect the conditions of the used calibration, for example "CBm14_WS_IRRAD_GRD_20"
 
@@ -55,7 +57,8 @@ To run the code, first you need to edit and set up the board configuration yaml 
 * selected_calibration_type: (string) The calibration to select for usage on the histogram data. This cannot be any sort of list! One type of calibration must be selected.
 * calib_bad_point_errorlimit_ns: (float) A threshold for the sigma of the measurement points in the calibration data: if a point has higher sigma than this, it is ignored from the calibration fit.
 * channels_on_calib_summary_plots: (2D list) This setting specifies which channels are shown on which summary plot (where the calibration fits for different channels are compared on the same plot). The first index denotes how many plots to make, and the second index contains which channels are on the plot. For example: [[0,3],[2,4,5]] will make two plots, the first one will show channels 0 and 3, and the second one will show channels 2, 4, and 5. Any number of plots can be made with any number of channels.
-* summary_plots_xticks_density: (float) The density of the xticks marks on the x axis for all calibration summary plots. Can be decreased for a cleaner plot, or can be increased to help see differences when comparing nearly identical channels.
+* calib_summary_plots_xticks_density: (float) The density of the xticks marks on the x axis for all calibration summary plots. Can be decreased for a cleaner plot, or can be increased to help see differences when comparing nearly identical channels.
+* calib_summary_plots_draw_grid (bool): Whether to draw a grid on the calibration summary plots.
 
 * cutoff_ns: (float) This is an upper cut on the x-axis of the raw ToT plot in nanoseconds: any data that belongs to a time bin larger than this value will not be plotted.
 * cutoff_fC: (float) This is an upper cut on the x-axis of the landau plot in fC (after calibration has been applied to the x-axis): similarly, any data that belongs to a higher fC bin than this value is not plotted, and is not considered in the initial Landau fit.
@@ -63,6 +66,7 @@ To run the code, first you need to edit and set up the board configuration yaml 
 * cutoff_lower: (list[6]) This adds an option to study and decrease the effect of too many near-zero points on the left tail for the refined fit. The numbers in the list specify for each channel, how many points to ignore from the left of the histogram data. For example, [3,0,0,0,0,0] means that only for channel 0, the three lowest points on the x-axis are ignored from the refined fit.
 
 * mpv_display_precision: (int) number of decimals for the MPV to show on the plots
+* MPV_summary_plot_separate_stat_syst_errorbars: (bool) If set to True, each point on the MPV vs threshold summary plot will have two errorbars: a colored one denoting the stat, and a black one denoting the stat+syst error. If set to False, only the total stat+syst errorbar is shown in color.
 
 * log_p0: (list[3]) Initial parameters for fitting the logarithm calibration: a + b*log(x+c) You may need to adjust especially the first parameter when changing boards.  
 * landau_p0: (list[3]) Initial parameters for the initial Landau fit: normalization factor, MPV, sigma. You may need to adjust the normalization factor when changing boards.
