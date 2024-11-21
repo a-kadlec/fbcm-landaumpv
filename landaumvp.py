@@ -16,6 +16,7 @@ import glob
 import warnings
 from scipy.interpolate import BSpline
 from scipy.integrate import simpson
+import mplhep as hep
 
 
 calib_text = {
@@ -32,6 +33,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+
 def main(argv: list[str] = sys.argv[1:]):
     args = parse_args(argv)
 
@@ -39,18 +41,20 @@ def main(argv: list[str] = sys.argv[1:]):
     with open(args.configfile_name, 'r') as file:
         config_file = yaml.safe_load(file)
 
-    if not os.path.exists(str(config_file['output_dir'])+"/calib_plots"):
-        os.makedirs(str(config_file['output_dir'])+"/calib_plots")
+    landau_dir = create_landau_dir(config_file)
+
+    if not os.path.exists(landau_dir/"calib_plots"):
+        os.makedirs(landau_dir/"calib_plots")
 
     calib.set_warnings(bool(args.show_warnings))
 
-    calibration = calib.get_board_calibration(config_file)
+    calibration = calib.get_board_calibration(config_file, landau_dir/"calib_plots")
 
     x_axes_data, y_axes_data = _process_input_files(config_file, args.timestamps)
 
-    output_dir = Path(config_file['output_dir'])
+
     print("Raw ToT plot...")
-    raw_tot_plot(x_axes_data, y_axes_data, output_dir/f"tot_raw_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png", config_file)
+    raw_tot_plot(x_axes_data, y_axes_data, landau_dir/f"tot_raw_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png", config_file)
     #print("Charge plot [log calib]...")
     #landaumvp_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit_log-cal.png", config_file, calibration, "log")
     #print("Charge plot [spline calib]...")
@@ -58,7 +62,21 @@ def main(argv: list[str] = sys.argv[1:]):
     #print("Common Charge plot [log vs pline calib]...")
     #landaumvp_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit.png", config_file, calibration, "both")
     print("Refined Landau plot...")
-    landaumvp_refined_fit(x_axes_data, y_axes_data, output_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_TH{config_file['threshold_per_channel']}.png", config_file, calibration)
+    landaumvp_refined_fit(x_axes_data, y_axes_data, landau_dir/f"tot_fc_fit-refined_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_TH{config_file['threshold_per_channel']}.png", config_file, calibration)
+
+def create_landau_dir(config_file):
+    board_number = config_file["board_number"]
+    measurement = config_file["measurement"]
+    threshold = config_file["threshold_per_channel"][0]
+    RC = config_file["RC"]
+    calibration_type = config_file["selected_calibration_type"]
+
+    landau_dir_name = f"testboard{board_number}_{measurement}_TH_{threshold}_RC{RC}_{calibration_type}"
+    output_dir = Path(config_file["output_dir"])
+    landau_dir = output_dir / landau_dir_name
+    landau_dir.mkdir(parents=True, exist_ok=True)
+
+    return landau_dir
 
 
 def get_histograms(data: bytes, timestamps: list = []) -> dict[str, list]:
@@ -186,13 +204,28 @@ def _process_input_files(config_file, argtimestamps):
 
 
 def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
+    plt.close() # necessary to avoid double FBCM text - no idea why the previous plot doesn't close correctly,apparently this fixes it
+
+
+    # threshold equality test
+    th_eq = config_file['threshold_per_channel'][0] if config_file['threshold_per_channel'].count(config_file['threshold_per_channel'][0]) == len(config_file['threshold_per_channel']) else False
 
     fig = plt.figure(1, figsize=(15, 10))
     ax = fig.add_subplot(111)
-    ax.set_title(f"FBCM", loc="left")
-    ax.set_title(f"board{config_file['board_number']}, RC"+str(config_file['RC']), loc="right")
-    colors=["blue","darkred","black","darkgreen","purple","darkorange"]
-    colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
+    hep.cms.label("Beam Test", loc=2, ax=ax, exp="FBCM", data=True, rlabel = f"Board { config_file['board_number'] }") 
+
+    if config_file['color_palette'] == "cms" or config_file['color_palette'] == "cms10":
+        # 10-color M. Petroff scheme
+        colors = ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"]   
+        colors_dots= ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"] 
+    elif config_file['color_palette'] == "cms6":
+        # 6-color M. Petroff scheme
+        colors = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+        colors_dots = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+    else:
+        # my custom colors with highlights
+        colors=["blue","darkred","black","darkgreen","purple","darkorange"]
+        colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
 
     cutoff = config_file['cutoff_ns']
     axs = []
@@ -224,23 +257,35 @@ def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
             if errorbars[i] == 0:
                 errorbars[i] = 1
 
+
+
+        hep.cms.label("Beam Test", loc=2, ax=ax, exp="FBCM", data=True, rlabel = f"Board { config_file['board_number'] }", fontsize=15) 
         #ax.plot(time_bins, y_axis, ".", color="black")   
         ax.plot(time_bins, y_axis, 'sb')
         ax.errorbar(time_bins, y_axis, yerr=errorbars, capsize=3, fmt=".", ecolor = "black")
 
-        fig.suptitle(f"FBCM - board{config_file['board_number']}, RC{config_file['RC']}",horizontalalignment="left",x = 0.05)
-        ax.set_title(f"Channel {channel_number}, th: {config_file['threshold_per_channel'][channel_number]} fC")
         ax.set_xticks(np.arange(math.floor(min(time_bins)), math.ceil(max(time_bins)), 4.0))
         ax.set_xticks(np.arange(math.floor(min(time_bins)), math.ceil(max(time_bins)), 2.0), minor=True)
-        ax.set_ylabel(f"Count / {bin_width:.2f} ns")
-        ax.set_xlabel("Time over threshold [ns]")
-        ax.grid(linestyle = "--")
+        ax.set_ylabel(f"Count / ({bin_width:.2f} ns)", fontsize=20)
+        ax.set_xlabel("Time over threshold [ns]", fontsize=20)
+
+        
+        ax.plot([], [], label=f"Ch {channel_number}, RC{config_file['RC']}\n th: {config_file['threshold_per_channel'][channel_number]} fC")
+        leg = ax.legend(loc='best', prop={'size': 18}, handletextpad=0, handlelength=0)
 
         fig = plt.figure(1)
         ax = plt.gca()
         
-        ax.plot(time_bins, y_axis*(1./max(y_axis)), 's', color=colors[channel_number])
-        ax.errorbar(time_bins, y_axis*(1./max(y_axis)), yerr=errorbars*(1./max(y_axis)), capsize=3, fmt=".", ecolor = colors[channel_number], color=colors_dots[channel_number], label = "Ch"+str(channel_number))
+
+        # Calculate integral of raw tot plot
+        # simson parameters: simpson(y, *, x=None, dx=1.0, axis=-1)
+        tot_integral = simpson(y_axis, x=time_bins)
+
+        legendlabel = f"Ch {channel_number}"
+        if not th_eq:
+            legendlabel += f", th: {config_file['threshold_per_channel'][channel_number]} fC"
+        ax.plot(time_bins, y_axis*(1./tot_integral), 's-', color=colors[channel_number])
+        ax.errorbar(time_bins, y_axis*(1./tot_integral), yerr=errorbars*(1./tot_integral), capsize=3, fmt=".", ecolor = colors[channel_number], color=colors_dots[channel_number], label = legendlabel)
 
         ax.grid(linestyle = "--")
         fig = plt.figure(2)
@@ -249,39 +294,71 @@ def raw_tot_plot(x_axes_data, y_axes_data, output_file, config_file):
     fig.savefig(output_file)
     plt.close()
 
+
+
     fig = plt.figure(1)
     ax = plt.gca()
-    ax.set_ylabel(f"Count [Max normalized to 1]")
-    ax.set_xlabel("Time over threshold [ns]")
-    ax.legend(loc="best")
-    ax.grid(linestyle = "--")
-    fig.savefig(config_file['output_dir']+f"/tot_raw_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
+    ax.set_xlabel('Time over threshold [ns]', fontsize=25, labelpad=10, loc='right')
+    ax.set_ylabel('Normalized count', fontsize=25, labelpad=10, loc='top')
+    ax.grid(visible=True, linestyle='-', linewidth=0.5, alpha=0.7)
+    legendtitle = f"RC{config_file['RC']}"
+    if th_eq:
+        legendtitle += f", th: {config_file['threshold_per_channel'][0]} fC"
+    ax.legend(title = legendtitle, loc='best')
+    ax.tick_params(axis='both', which='major', labelsize=25)
+    fig.savefig(output_file.parent / f"tot_raw_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
     plt.close()
 
 
 
 
 
-
-
-
 def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, calibration):
-
+    plt.close()
     calib_type = config_file['selected_calibration_type']
 
     fig = plt.figure(1, figsize=(15, 10))
     ax = fig.add_subplot(111)
-    ax.set_title("FBCM", loc="left")
-    ax.set_title(f"board{config_file['board_number']}, RC{config_file['RC']}, used calibration: {calib_text[calib_type]}", loc="right")
-    colors=["blue","darkred","black","darkgreen","purple","darkorange"]
-    colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
+    hep.cms.label("Beam Test", loc=2, ax=ax, exp="FBCM", data=True, rlabel = f"Board {config_file['board_number']}, calibration: {calib_text[calib_type]}") 
 
+
+    # threshold equality test
+    th_eq = config_file['threshold_per_channel'][0] if config_file['threshold_per_channel'].count(config_file['threshold_per_channel'][0]) == len(config_file['threshold_per_channel']) else False
+    
+    if config_file['color_palette'] == "cms" or config_file['color_palette'] == "cms10":
+        # 10-color M. Petroff scheme
+        colors = ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"]   
+        colors_dots= ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"] 
+    elif config_file['color_palette'] == "cms6":
+        # 6-color M. Petroff scheme
+        colors = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+        colors_dots = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+    else:
+        # my custom colors with highlights
+        colors=["blue","darkred","black","darkgreen","purple","darkorange"]
+        colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
+
+    subplot_layout = {
+        1: (1,1),
+        2: (1,2),
+        3: (2,2),
+        4: (2,2),
+        5: (2,3),
+        6: (2,3),
+    }
+
+    num_subplots = 6
+    if config_file['skip_channels']:
+        num_subplots -= len(config_file['skip_channels'])
+    
+    
     axs = []
     bottom_axs = []
     fig = plt.figure(2, tight_layout=True, figsize=(15, 10))
-    gs_top_level = plt.GridSpec(2, 3, figure=fig)
-    for i in range(6):
-        gs = gs_top_level[i].subgridspec(2, 1, height_ratios=[4, 1], hspace=0)
+    gs_top_level = plt.GridSpec(subplot_layout[num_subplots][0], subplot_layout[num_subplots][1], figure=fig)
+    #gs_top_level.update(wspace=0.025, hspace=0.05) # set the spacing between axes. 
+    for i in range(num_subplots):
+        gs = gs_top_level[i].subgridspec(2, 1, height_ratios=[4, 1], hspace=-0.5, wspace=-1.0)
         axs.append(fig.add_subplot(gs[0]))
         bottom_axs.append(0)
 
@@ -292,14 +369,19 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
     mpv_systs_down = []
 
     missing_channels = []
-    with open(config_file['output_dir']+"/results_board"+str(config_file['board_number'])+"_"+config_file['measurement']+".dat", "w") as result_file:
+    with open(output_file.parent / f"results_board{config_file['board_number']}_{config_file['measurement']}.dat", "w") as result_file:
         print("#Channel number | ToT Integral | MPV [fC] | MPV stat [fC] | MPV syst up [fC] | MPV syst down [fC] | d_eff [um] | d_eff stat+syst up [um] | d_eff stat+syst down [um] | dev. from expected d_eff (%)", file=result_file)
 
-
+        plot_number = 0
         for channel_number in range(len(y_axes_data)):
+            if channel_number in config_file['skip_channels']:
+                print(f"Config file info: skipping channel {channel_number}")
+                missing_channels.append(channel_number)
+                continue
+
             time_bins = x_axes_data[channel_number]
             y_axis = y_axes_data[channel_number]
-            ax = axs[channel_number]
+            ax = axs[plot_number]
             bin_width = time_bins[-1]/len(time_bins)
 
             if config_file['cutoff_ns']:
@@ -309,18 +391,12 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
                         y_axis = y_axis[:i]
                         break
         
-            ax.set_title(f"Channel {channel_number}, th: {config_file['threshold_per_channel'][channel_number]} fC")
+            hep.cms.label("Beam Test", loc=2, ax=ax, exp="FBCM", data=True, rlabel = f"Board {config_file['board_number']}, calibration: {calib_text[calib_type]}", fontsize=12) 
 
-            # Calculate integral of raw tot plot
+            # Calculate integral of raw tot plot, to be saved in output file
             # simson parameters: simpson(y, *, x=None, dx=1.0, axis=-1)
             tot_integral = simpson(y_axis, x=time_bins)
 
-            if channel_number in config_file['skip_channels']:
-                print(f"Config file info: skipping channel {channel_number}")
-                missing_channels.append(channel_number)
-                ax.plot([], [], label="Channel skipped!") 
-                ax.legend(loc='center', handletextpad=0, handlelength=0)
-                continue
 
 
             # Conversion of x axis to fc
@@ -439,24 +515,32 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
             mpvs.append(popt_ref[1])
             mpv_errs.append(perr_ref[1])
 
+            mpv_error_total_up = perr_ref[1] + mpv_systs_up[-1]
+            mpv_error_total_down = perr_ref[1] + mpv_systs_down[-1]
+            '''# preserve this
             mpv_string = eval( " '%."+str(config_file['mpv_display_precision'])+"f±%."+str(config_file['mpv_display_precision'])+"f' % (popt_ref[1],perr_ref[1])"  
             + "+"+ "r'$^{+%."+str(config_file['mpv_display_precision'])+r"f}_{-%."+str(config_file['mpv_display_precision'])+r"f}$'  % (mpv_systs_up[-1],mpv_systs_down[-1])"    )
+            '''
+            mpv_string = eval( " '%."+str(config_file['mpv_display_precision'])+"f' % popt_ref[1]"
+            + "+"+ "r'$^{+%."+str(config_file['mpv_display_precision'])+r"f}_{-%."+str(config_file['mpv_display_precision'])+r"f}$'  % (mpv_error_total_up,mpv_systs_down[-1])"    )
+
 
             if len(fc_bins_off) > 0:
                 ax.plot(x_axis_off, popt_ref[0]*landau.pdf(x_axis_off, popt_ref[1], popt_ref[2]), "--", color="crimson")  
-            ax.plot(x_axis_fit, popt_ref[0]*landau.pdf(x_axis_fit, popt_ref[1], popt_ref[2]), "-", color="crimson", label = f"MPV = ({mpv_string}) fC\n"+r"$d_{eff}$"+r" = (%.2f$^{+%.2f}_{-%.2f}$)" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1])     ) + r" $\mu$m")  
+
+            channel_legendtitle = f"Ch {channel_number}, RC{config_file['RC']}, th: {config_file['threshold_per_channel'][channel_number]} fC\n"
+            ax.plot(x_axis_fit, popt_ref[0]*landau.pdf(x_axis_fit, popt_ref[1], popt_ref[2]), "-", color="crimson", label = channel_legendtitle + f"MPV = ({mpv_string}) fC\n"+r"$d_{eff}$"+r" = (%.2f$^{+%.2f}_{-%.2f}$)" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1])     ) + r" $\mu$m")  
                     # "MPV=(%.2f±%.2f) fC" % (popt_ref[1],perr_ref[1]))  
 
 
-            leg = ax.legend(loc='best', prop={'size': 11}, handletextpad=0, handlelength=0)
+            leg = ax.legend(loc='best', fontsize=14, handletextpad=0, handlelength=0)
             #for item in leg.legendHandles:
             #    item.set_visible(False)
-            fig.suptitle(f"FBCM - board{config_file['board_number']}, RC{config_file['RC']}, used calibration: {calib_text[calib_type]}",horizontalalignment="left",x = 0.05)
 
             ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 2.0))
             ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 1.0), minor=True)
-            ax.set_ylabel(f"Count")
-            ax.set_xlabel("Charge [fC]")
+            ax.set_ylabel(f"Count", fontsize=20)
+            ax.set_xlabel("Charge [fC]", fontsize=20)
             ax.grid(linestyle = "--")
 
             dev_from_expected = abs(config_file['expected_thickness_per_channel'][channel_number] - _mpv_to_thickness(popt_ref[1]))/config_file['expected_thickness_per_channel'][channel_number] * 100 
@@ -465,41 +549,52 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
 
             print(str(channel_number), tot_integral, popt_ref[1], perr_ref[1], mpv_systs_up[-1], mpv_systs_down[-1], _mpv_to_thickness(popt_ref[1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]), _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1]), dev_from_expected, file=result_file)
 
+
+
+
             fig = plt.figure(1)
             ax = plt.gca()
             
+
+
+            labelfirstrow = f"Ch {channel_number}, "
+            if not th_eq:
+                labelfirstrow += f"th: {config_file['threshold_per_channel'][channel_number]} fC\n"
+            normalizationfactor_integral = simpson(y_axis, x=fc_bins)
             y_axis_fit = np.array(y_axis_fit)
-            ax.plot(fc_bins_fit, y_axis_fit*(1./max(y_axis_fit)),  's', color=colors[channel_number])
-            ax.errorbar(fc_bins_fit, y_axis_fit*(1./max(y_axis_fit)), yerr=np.sqrt(y_axis_fit)*(1./max(y_axis_fit)), capsize=3, fmt=".", ecolor = colors[channel_number], color=colors_dots[channel_number])
-            ax.plot(x_axis_fit, popt_ref[0]*landau.pdf(x_axis_fit, popt_ref[1], popt_ref[2])*(1./max(y_axis_fit)), "-", color=colors[channel_number], label = f"Ch{channel_number} MPV = ({mpv_string}) fC\n"+r"$d_{eff}$"+r" = (%.2f$^{+%.2f}_{-%.2f}$)" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1])     ) + r" $\mu$m")  
+            ax.plot(fc_bins_fit, y_axis_fit*(1./normalizationfactor_integral),  's', color=colors[channel_number])
+            ax.errorbar(fc_bins_fit, y_axis_fit*(1./normalizationfactor_integral), yerr=np.sqrt(y_axis_fit)*(1./normalizationfactor_integral), capsize=3, fmt=".", ecolor = colors[channel_number], color=colors_dots[channel_number])
+            ax.plot(x_axis_fit, popt_ref[0]*landau.pdf(x_axis_fit, popt_ref[1], popt_ref[2])*(1./normalizationfactor_integral), "-", color=colors[channel_number], label = labelfirstrow + f"MPV = ({mpv_string}) fC\n"+r"$d_{eff}$"+r" = (%.2f$^{+%.2f}_{-%.2f}$)" % (_mpv_to_thickness(popt_ref[1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_up[-1]) , _mpv_to_thickness(perr_ref[1])+_mpv_to_thickness(mpv_systs_down[-1])     ) + r" $\mu$m")  
             ax.grid(linestyle = "--")
             fig = plt.figure(2)
             ax = plt.gca()
+
+            plot_number += 1
 
     fig.savefig(output_file)
     plt.close(fig)
 
     fig = plt.figure(1)
     ax = plt.gca()
-    ax.set_ylabel(f"Count [Max normalized to 1]")
+    ax.set_ylabel(f"Normalized count")
     ax.set_xlabel("Charge [fC]")
-    ax.legend(loc='best', prop={'size': 12})
+    legendtitle = f"RC{config_file['RC']}"
+    if th_eq:
+        legendtitle += f", th: {config_file['threshold_per_channel'][0]} fC"
+    ax.legend(title=legendtitle, loc='best', fontsize=16, title_fontsize=16)
     ax.grid(linestyle = "--")
-    fig.savefig(config_file['output_dir']+f"/tot_fc_fit_refined_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
+    fig.savefig(output_file.parent / f"tot_fc_fit_refined_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}.png")
     plt.close(fig)
 
 
     # Summary plot
-    fig = plt.figure(3, figsize=(7, 5), tight_layout=True)
+    fig = plt.figure(3, figsize=(8, 8), tight_layout=True)
     axeslimit_default = plt.rcParams['axes.autolimit_mode']
     plt.rcParams['axes.autolimit_mode'] = 'round_numbers'
     ax = fig.add_subplot(111)
-    ax.set_title("FBCM",loc="left")
-    ax.set_title(f"board{config_file['board_number']}, RC{config_file['RC']}",loc="right")
+    hep.cms.label("Beam Test", loc=2, ax=ax, exp="FBCM", data=True, rlabel = f"Board { config_file['board_number'] }") 
     ax.set_xlabel('Threshold [fC]')
     ax.set_ylabel('MPV [fC]')
-    colors=["blue","darkred","black","darkgreen","purple","darkorange"]
-    colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
 
     valid_channels = [i for i in range(6) if i not in missing_channels]
 
@@ -507,9 +602,14 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
         #asymmetric_error = np.array(list(zip(mpv_errs[i]+mpv_systs_down[i], mpv_errs[i]+mpv_systs_up[i]))).T
         asymmetric_error = [[mpv_errs[i]+mpv_systs_down[i]], [mpv_errs[i]+mpv_systs_up[i]]]
 
-        ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=asymmetric_error, capsize=3, fmt=".", ecolor = "black", color="black")
-        ax.plot(config_file['threshold_per_channel'][i], mpvs[i], 's', color=colors[valid_channels[i]])
-        ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=mpv_errs[i], capsize=3, fmt=".", ecolor = colors[valid_channels[i]], color=colors_dots[valid_channels[i]], label="Channel "+str(valid_channels[i]))
+        if config_file['MPV_summary_plot_separate_stat_syst_errorbars']:
+            ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=asymmetric_error, capsize=3, fmt=".", ecolor = "black", color="black")
+            ax.plot(config_file['threshold_per_channel'][i], mpvs[i], 's', color=colors[valid_channels[i]])
+            ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=mpv_errs[i], capsize=3, fmt=".", ecolor = colors[valid_channels[i]], color=colors_dots[valid_channels[i]], label="Ch"+str(valid_channels[i]))
+        else:
+            ax.plot(config_file['threshold_per_channel'][i], mpvs[i], 's', color=colors[valid_channels[i]])
+            ax.errorbar(config_file['threshold_per_channel'][i], mpvs[i], yerr=asymmetric_error, capsize=3, fmt=".", ecolor = colors[valid_channels[i]], color=colors_dots[valid_channels[i]], label="Ch"+str(valid_channels[i]))
+
 
     ax.grid(linestyle = "--")
 
@@ -523,14 +623,14 @@ def landaumvp_refined_fit(x_axes_data, y_axes_data, output_file, config_file, ca
     ax2 = ax.twinx()
     ax2.set_ylim(_mpv_to_thickness(y1),_mpv_to_thickness(y2))
     ax2.set_yticks( _mpv_to_thickness(yticks_major))
-    ax2.tick_params(axis="y", which = 'major', labelsize=10)
-    ax2.set_ylabel(r"$d_{eff}$ [$\mu$m]", fontsize = 14)
+    ax2.tick_params(axis="y", which = 'major', labelsize=18)
+    ax2.set_ylabel(r"$d_{eff}$ [$\mu$m]", fontsize = 28)
     ax2.set_xlim(x1,x2)
 
 
-    ax.legend(loc='best', prop={'size': 11})
+    ax.legend(title = f"RC{config_file['RC']}", loc='best', fontsize=16, title_fontsize=16)
 
-    fig.savefig(config_file['output_dir']+f"/MPV_th_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_{calib_type}-calib.png")
+    fig.savefig(output_file.parent / f"MPV_th_summary_board{config_file['board_number']}_{config_file['measurement']}_rc{config_file['RC']}_{calib_type}-calib.png")
     plt.rcParams['axes.autolimit_mode'] = axeslimit_default
 
 
@@ -640,7 +740,7 @@ def landaumvp_fit(x_axes_data, y_axes_data, output_file, config_file, calibratio
         else:
             fig.suptitle(f"Distribution fits to Amplitude Spectrum of board{config_file['board_number']}, RC{config_file['RC']}, {calib_type}-cal.")
 
-        ax.set_title(f"Channel {channel_number}, th: {calibration['th'][calib_i]} fC")
+        ax.set_title(f"Ch{channel_number}, th: {calibration['th'][calib_i]} fC")
         ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 2.0))
         ax.set_xticks(np.arange(math.floor(min(fc_bins)), math.ceil(max(fc_bins)), 1.0), minor=True)
         ax.set_ylabel(f"Count")

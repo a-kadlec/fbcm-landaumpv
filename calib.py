@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 from scipy.optimize import curve_fit, OptimizeWarning
 import math
 import warnings
+import mplhep as hep
 
 bShowAllWarnings = False
 def set_warnings(b):
@@ -61,10 +62,33 @@ def process_npz(npz):
     return npz
 
 
+def left_right_check(data,expected_side):
+    channels = data['toa_tot']['test_conditions']["testboard_channels"]
+    # We expect Right:0,1,2, Left:3,4,5
+    if expected_side == "right":
+        if not np.array_equal(channels, [0,1,2]):
+            raise Exception(f"ASIC side error: Expecting channels [0, 1, 2] in the file for the RIGHT asic, but got {channels} instead. Check your config file!")
+    elif expected_side == "left":
+        if not np.array_equal(channels, [3,4,5]):
+            raise Exception(f"ASIC side error: Expecting channels [3, 4, 5] in the file for the LEFT asic, but got {channels} instead. Check your config file!")
+    elif expected_side == "single":
+        if not np.array_equal(channels, [0,1,2,3,4,5]):
+            raise Exception(f"ASIC side error: Expecting channels [0, 1, 2, 3, 4, 5] in the file for just one ASIC, but got {channels} instead. Check your config file, perhaps this board has 2 ASICs?")
 
-def get_ASIC_calibration(data, sample, config_file):
+
+def get_ASIC_calibration(data, sample, config_file, output_path):
     matplotlib.rc('font', size=16)
     
+    if config_file['color_palette'] == "cms" or config_file['color_palette'] == "cms10":
+        # 10-color M. Petroff scheme
+        colors = ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"]   
+    elif config_file['color_palette'] == "cms6":
+        # 6-color M. Petroff scheme
+        colors = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+    else:
+        # my custom colors
+        colors=["darkred","green","purple","darkorange","black","blue"]
+
     # check what calibrations to calculate
     bCalibLog = False
     bCalibSpline = False
@@ -182,10 +206,12 @@ def get_ASIC_calibration(data, sample, config_file):
                 output['th'].append(test_conditions['th_list_fC'][th_level_fC])
                 output['channel'].append(testboard_channel)
 
+                hep.label.data = True
+                hep.style.use("CMS")
+                hep.cms.text("",exp="FBCM")
                 fig = plt.figure(2)
                 ax = fig.add_axes([0,0,1,1])
-                ax.set_title("FBCM", loc="left")
-                ax.set_title('CH: %s, RC=%x, th=%.2f fC' % (testboard_channel, test_conditions['rccal'][r], test_conditions['th_list_fC'][th_level_fC]), loc="right")
+                hep.cms.label(" ", loc=2, ax=ax, exp="FBCM", data=True, rlabel = f"Board { config_file['board_number'] }") 
                 ax.set_ylabel('Time [ns]')
                 ax.set_xlabel('Input charge [fC]')
                 # start = np.argmin(err[r,0:256:step])*step # find first False what means first valid value
@@ -330,14 +356,20 @@ def get_ASIC_calibration(data, sample, config_file):
                 #print(chcalval[start]*1e15)
                 #ax.plot(chcalval[start:end:step]*1e15, toa[r,start:end:step]*1e9, 'sr', label='ToA')
 
-                ax.plot(xvalues_filtered, myTot_filtered, 'sb', label='ToT')
-                if bUseSigma:
-                    ax.errorbar(xvalues_filtered, myTot_filtered, yerr=sigma_filtered, capsize=3, fmt=".", ecolor = "black")
+
+                if "cms" in config_file['color_palette']:
+                    ax.plot(xvalues_filtered, myTot_filtered, 's', label='ToT', markersize=7, color = "black")
+                    if bUseSigma:
+                        ax.errorbar(xvalues_filtered, myTot_filtered, yerr=sigma_filtered, capsize=3, fmt=".", color= "black", ecolor = "black",markersize=5)
+                else:
+                    ax.plot(xvalues_filtered, myTot_filtered, 'sb', label='ToT', markersize=7)
+                    if bUseSigma:
+                        ax.errorbar(xvalues_filtered, myTot_filtered, yerr=sigma_filtered, capsize=3, fmt=".", ecolor = "black",markersize=5)
 
                 if xvalues_off:
                     ax.errorbar(xvalues_off, myTot_off, yerr=sigma_off, capsize=3, fmt="x", ecolor = "black", color="black")
                 
-                ax.plot(xvalues, tw[r,th_level_fC,start:end:step]*1e9, 'or', label='TW')
+                ax.plot(xvalues, tw[r,th_level_fC,start:end:step]*1e9, 'o', label='TW', color=colors[0])
 
                 goodlim_x = ax.get_xlim()
                 goodlim_y = ax.get_ylim()
@@ -348,22 +380,22 @@ def get_ASIC_calibration(data, sample, config_file):
 
                 if bCalibLog:
                     #params = ["%.2f" % p for p in popt]
-                    ax.plot(fit_chcalval, fit_tot, 'g', label=r"Log fit, $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf))    
+                    ax.plot(fit_chcalval, fit_tot, label=r"Log fit, $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf), color=colors[1], linewidth=2)    
                     #'Log fit %s' %  params +r      doesn't make much sense to print params (doesn't mean anything without errors, but also not printing errors due to space on plot...)
 
                 x_range = np.linspace(goodlim_x[0], goodlim_x[1],1000)
-                if bCalibSpline:
-                    ax.plot(x_range, BSpline(*tck_s)(x_range), 'purple', label=f'Cubic spline (smoothing={smoothing})'+r", $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf_sp))
                 if bCalibLinear:
-                    ax.plot(x_range, interp_result(x_range), 'darkorange', label="Linear interpolation")
+                    ax.plot(x_range, interp_result(x_range), label="Linear interpolation", color=colors[2], linewidth=2)
+
+                if bCalibSpline:
+                    ax.plot(x_range, BSpline(*tck_s)(x_range), label=f'Cubic spline (smoothing={smoothing})'+r", $\chi^{2}$/dof="+"{:.1f}".format(chi2ondf_sp), color=colors[3], linewidth=2)
 
                 ax.set_xlim(goodlim_x)
                 ax.set_ylim(goodlim_y)
 
                 #fig.legend(loc=[0.14,0.82], prop={'size': 10})
-                ax.legend(loc='best', prop={'size': 10})  # bbox_to_anchor=(0, 0, 0.9, 0.9)
-                # plt.yscale('log')
-                fig.savefig(config_file['output_dir']+'/calib_plots/tot_tw_sample_%s_channel_%d_rccal_%d_th_%s.jpg' % (sample, testboard_channel, test_conditions['rccal'][r],  test_conditions['th_list_fC'][th_level_fC]), format='jpg', bbox_inches='tight')
+                ax.legend(title=f"Ch {testboard_channel}, RC{test_conditions['rccal'][r]}, th: {test_conditions['th_list_fC'][th_level_fC]} fC", loc='best', fontsize=25, title_fontsize = 25)  
+                fig.savefig(str(output_path)+'/tot_tw_sample_%s_channel_%d_rccal_%d_th_%s.jpg' % (sample, testboard_channel, test_conditions['rccal'][r],  test_conditions['th_list_fC'][th_level_fC]), format='jpg', bbox_inches='tight')
                 plt.close()
 
 
@@ -382,7 +414,7 @@ def get_ASIC_calibration(data, sample, config_file):
 
 
 
-def get_board_calibration(config_file):
+def get_board_calibration(config_file, output_path):
     matplotlib.rc('font', size=16)
     
     
@@ -395,12 +427,16 @@ def get_board_calibration(config_file):
 
     data = process_npz(dict(np.load(config_file['calibration_data'], allow_pickle=True, encoding="ASCII")))
 
-    output, tot_summary = get_ASIC_calibration(data, sample, config_file)
+    left_right_check(data,"right" if config_file['calibration_data_left'] else "single")
+
+    output, tot_summary = get_ASIC_calibration(data, sample, config_file, output_path)
 
     if config_file['calibration_data_left']:
+
         data_left = process_npz(dict(np.load(config_file['calibration_data_left'], allow_pickle=True, encoding="ASCII")))
+        left_right_check(data_left,"left")
         sample_left = str(samplenum) + meas + "_L"
-        output_left, tot_summary_left = get_ASIC_calibration(data_left,sample_left, config_file)
+        output_left, tot_summary_left = get_ASIC_calibration(data_left,sample_left, config_file, output_path)
 
         # ASICS use channels 0,2,5, Right:0,1,2, Left:3,4,5
         # but this is no longer necessary since get_ASIC_calibration now loops on testboard_channels instead of asic_channels
@@ -450,16 +486,27 @@ def get_board_calibration(config_file):
 
             fig = plt.figure(2, figsize=(15, 10))
             ax = fig.add_subplot(111)
-            colors=["blue","darkred","black","darkgreen","purple","darkorange"]
-            colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
-            ax.set_title("FBCM", loc="left")
-            ax.set_title(f"board{config_file['board_number']}, RC{config_file['RC']}", loc="right")
-            ax.set_xlabel('Input charge [fC]')
-            ax.set_ylabel('Time [ns]')
+            hep.cms.label(" ", loc=2, ax=ax, exp="FBCM", data=True, rlabel = f"Board {config_file['board_number']}") 
+
+            if config_file['color_palette'] == "cms" or config_file['color_palette'] == "cms10":
+                # 10-color M. Petroff scheme
+                colors = ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"]   
+                colors_dots= ["#3f90da", "#ffa90e", "#bd1f01", "#94a4a2", "#832db6", "#a96b59", "#e76300", "#b9ac70", "#717581", "#92dadd"] 
+            elif config_file['color_palette'] == "cms6":
+                # 6-color M. Petroff scheme
+                colors = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+                colors_dots = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+            else:
+                # my custom colors with highlights
+                colors=["blue","darkred","black","darkgreen","purple","darkorange"]
+                colors_dots=['dodgerblue',"red","grey","green","magenta","orange"]
+
+            ax.set_xlabel('Input charge [fC]',fontsize=25, labelpad=10, loc='right')
+            ax.set_ylabel('Time [ns]',fontsize=25, labelpad=10, loc='top')
             for i in channels_for_plot_reindexed_by_missing:
-                label_i = "Channel "+str(tot_summary['tot_summary_text'][i]['ch'])
+                label_i = "Ch "+str(tot_summary['tot_summary_text'][i]['ch'])
                 if not th_eq:
-                    label_i += ", threshold: "+str(tot_summary['tot_summary_text'][i]['th'])+" fC"
+                    label_i += ", th: "+str(tot_summary['tot_summary_text'][i]['th'])+" fC"
                 ax.plot(tot_summary['tot_summary_x'][i], tot_summary['tot_summary'][i], 's', color=colors[valid_channels[i]])
                 ax.errorbar(tot_summary['tot_summary_x'][i], tot_summary['tot_summary'][i], yerr=tot_summary['tot_std_summary'][i], capsize=3, fmt=".", ecolor = colors[valid_channels[i]], color=colors_dots[valid_channels[i]], label=label_i) 
             goodlim_x = ax.get_xlim()
@@ -479,26 +526,25 @@ def get_board_calibration(config_file):
 
             current_xtics_major = ax.get_xticks()
             current_ytics_major = ax.get_yticks()
-            ax.set_xticks(np.arange(current_xtics_major[0],current_xtics_major[-1],1))
-            ax.set_xticks(np.arange(current_xtics_major[0],current_xtics_major[-1],config_file['summary_plots_xticks_density']),minor=True)
-            ax.set_yticks(np.arange(current_ytics_major[0],current_ytics_major[-1],1)) #,minor=True)
+            ax.set_xticks(np.arange(current_xtics_major[0],current_xtics_major[-1],2))
+            ax.set_xticks(np.arange(current_xtics_major[0],current_xtics_major[-1],config_file['calib_summary_plots_xticks_density']),minor=True)
+            ax.set_yticks(np.arange(current_ytics_major[0],current_ytics_major[-1],2)) #,minor=True)
+            ax.tick_params(axis='both', which='major', labelsize=25)
 
-            ax.grid(linestyle = "-")
-            ax.grid(linestyle = "--", which='minor')
+            if(config_file['calib_summary_plots_draw_grid']):
+                ax.grid(linestyle = "-")
 
             ax.set_xlim(goodlim_x)
             ax.set_ylim(goodlim_y)
 
-            if th_eq:
-                ax.legend(title="Threshold: "+str(th_eq)+" fC",loc='best')
-            else:
-                ax.legend(loc='best') #, prop={'size': 10})  # bbox_to_anchor=(0, 0, 0.9, 0.9)
+            legendtitle = f"RC{config_file['RC']}, th: "+str(th_eq)+" fC" if th_eq else f"RC{config_file['RC']}"
+            ax.legend(title=legendtitle,loc='best', fontsize=25, title_fontsize = 25)
 
             fnameindex = "ch"+str( config_file['channels_on_calib_summary_plots'][i_plot][0] )
             for j in range(1,len(config_file['channels_on_calib_summary_plots'][i_plot]),1):
                 fnameindex += "-"+str(config_file['channels_on_calib_summary_plots'][i_plot][j])
 
-            fig.savefig(config_file['output_dir']+'/calib_plots/tot_tw_sample_%s_rccal_%d_summary_%s.jpg' % (sample, config_file['RC'], fnameindex), format='jpg', bbox_inches='tight')
+            fig.savefig(str(output_path)+'/tot_tw_sample_%s_rccal_%d_summary_%s.jpg' % (sample, config_file['RC'], fnameindex), format='jpg', bbox_inches='tight')
             plt.close()
 
     
@@ -510,6 +556,8 @@ if __name__ == "__main__":
     import yaml
     import argparse
     import sys
+    import landaumvp
+
     def parse_args(argv: list[str]) -> argparse.Namespace:
         parser = argparse.ArgumentParser()
         parser.add_argument('configfile_name')
@@ -521,13 +569,15 @@ if __name__ == "__main__":
         config_file = yaml.safe_load(file)
 
 
-    if not os.path.exists(str(config_file['output_dir'])+"/calib_plots"):
-        os.makedirs(str(config_file['output_dir'])+"/calib_plots")
+    landau_dir = landaumvp.create_landau_dir(config_file)
+
+    if not os.path.exists(landau_dir/"calib_plots"):
+        os.makedirs(landau_dir/"calib_plots")
 
     set_warnings(bool(args.show_warnings))
 
 
-    output = get_board_calibration(config_file)
+    output = get_board_calibration(config_file, landau_dir/"calib_plots")
     #print(output)
     #import code
     #code.interact(local=locals())
