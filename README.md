@@ -1,4 +1,4 @@
-# TBTools
+# fbcmTBTools
 This project has been entirely moved to be a part of the BRIL TBTools project: https://gitlab.cern.ch/bril-phase2/fbcmTBTools/-/tree/master/EffectiveThickness?ref_type=heads
 This is page is now defunct, get the code and documentation on the above link instead.
 
